@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import { renderToStaticMarkup } from "react-dom/server";
+import { divIcon } from "leaflet";
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import {
   Alert, AppBar, Avatar, AvatarGroup, Badge, BottomNavigation, BottomNavigationAction, Box, Button,
@@ -158,6 +160,10 @@ function Plan({ stops, setStops, onAdd, onEdit, toast, onPersist, onReorder, day
 function MapFocus({ locations }) { const map=useMap(); useEffect(()=>{ if(!locations.length)return; const bounds=locations.map((loc)=>[Number(loc.latitude),Number(loc.longitude)]); map.fitBounds(bounds,{padding:[45,45],maxZoom:16}); },[locations.map((x)=>`${x.latitude}:${x.longitude}:${x.updated_at||x.id}`).join("|")]); return null; }
 function relativeLocationTime(value) { const seconds=Math.max(0,Math.round((Date.now()-new Date(value).getTime())/1000)); if(seconds<60)return "เมื่อสักครู่"; if(seconds<3600)return `${Math.floor(seconds/60)} นาทีที่แล้ว`; if(seconds<86400)return `${Math.floor(seconds/3600)} ชม. ที่แล้ว`; return `${Math.floor(seconds/86400)} วันที่แล้ว`; }
 function localDateString(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function memberMapIcon(member) {
+  const html=renderToStaticMarkup(<div className="friend-map-marker" style={{"--friend-color":member.color||"#7fc5eb"}}>{member.avatar?<img src={member.avatar} alt=""/>:<span>{member.emoji||member.name?.slice(0,1)||"🙂"}</span>}<i/></div>);
+  return divIcon({html,className:"friend-map-icon",iconSize:[52,58],iconAnchor:[26,54],popupAnchor:[0,-54]});
+}
 
 function MapPage({ members, stops, toast, demo = false, trip, account, locations, setLocations }) {
   const [sharing,setSharing]=useState(false); const [busy,setBusy]=useState(false); const watchRef=useRef(null); const lastSentRef=useRef(0);
@@ -177,7 +183,7 @@ function MapPage({ members, stops, toast, demo = false, trip, account, locations
   };
   return <Stack spacing={2}>
     <Box><Typography variant="overline">แผนที่กลุ่ม</Typography><Typography variant="h4">เพื่อนอยู่ไหนกัน</Typography><Typography color="text.secondary">ตำแหน่งล่าสุดของสมาชิกที่กดอนุญาตแชร์</Typography></Box>
-    <Box className="real-map"><MapContainer center={center} zoom={13} scrollWheelZoom className="leaflet-map"><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/><MapFocus locations={allMapPoints}/>{stopLocations.map((stop)=><CircleMarker key={`stop-${stop.id}`} center={[Number(stop.latitude),Number(stop.longitude)]} radius={8} pathOptions={{color:"#fff",weight:3,fillColor:"#5f8ca7",fillOpacity:1}}><Popup><strong>{stop.title}</strong><br/>{stop.place}<br/><a href={stop.googleMapsUrl||`https://www.google.com/maps/search/?api=1&query=${stop.latitude},${stop.longitude}`} target="_blank" rel="noreferrer">นำทาง</a></Popup></CircleMarker>)}{activeLocations.map((loc)=>{const member=members.find((m)=>m.id===loc.user_id);if(!member)return null;return <CircleMarker key={loc.user_id} center={[Number(loc.latitude),Number(loc.longitude)]} radius={12} pathOptions={{color:"#fff",weight:4,fillColor:member.color,fillOpacity:1}}><Popup><strong>{member.name}</strong><br/>{relativeLocationTime(loc.updated_at)}<br/><small>ความแม่นยำประมาณ {Math.round(loc.accuracy_m||0)} ม.</small><br/><a href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`} target="_blank" rel="noreferrer">เปิดใน Google Maps</a></Popup></CircleMarker>})}</MapContainer></Box>
+    <Box className="real-map"><MapContainer center={center} zoom={13} scrollWheelZoom className="leaflet-map"><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/><MapFocus locations={allMapPoints}/>{stopLocations.map((stop)=><CircleMarker key={`stop-${stop.id}`} center={[Number(stop.latitude),Number(stop.longitude)]} radius={8} pathOptions={{color:"#fff",weight:3,fillColor:"#5f8ca7",fillOpacity:1}}><Popup><strong>{stop.title}</strong><br/>{stop.place}<br/><a href={stop.googleMapsUrl||`https://www.google.com/maps/search/?api=1&query=${stop.latitude},${stop.longitude}`} target="_blank" rel="noreferrer">นำทาง</a></Popup></CircleMarker>)}{activeLocations.map((loc)=>{const member=members.find((m)=>m.id===loc.user_id);if(!member)return null;return <Marker key={loc.user_id} position={[Number(loc.latitude),Number(loc.longitude)]} icon={memberMapIcon(member)} zIndexOffset={500}><Popup><strong>{member.name}</strong><br/>{relativeLocationTime(loc.updated_at)}<br/><small>ความแม่นยำประมาณ {Math.round(loc.accuracy_m||0)} ม.</small><br/><a href={`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`} target="_blank" rel="noreferrer">เปิดใน Google Maps</a></Popup></Marker>})}</MapContainer></Box>
     {!inTripWindow&&<Alert severity="warning">แชร์ตำแหน่งได้เฉพาะ {formatTripDate(trip?.start_date,trip?.end_date)}</Alert>}
     {!activeLocations.length&&<Alert severity="info">ยังไม่มีสมาชิกแชร์ตำแหน่ง</Alert>}
     <BusyButton busy={busy} disabled={!demo&&!inTripWindow} variant={sharing?"outlined":"contained"} color={sharing?"error":"primary"} startIcon={sharing?<StopCircleRounded/>:<MyLocationRounded/>} onClick={toggle}>{sharing?"หยุดแชร์ตำแหน่ง":inTripWindow?"เริ่มแชร์ตำแหน่ง":"ยังไม่ถึงช่วงทริป"}</BusyButton>
