@@ -1,0 +1,12 @@
+{
+  "name": "TripMate – ทริปของเรา",
+  "short_name": "TripMate",
+  "description": "วางแผนเที่ยว แชร์ตำแหน่ง และเคลียร์ค่าใช้จ่ายกับเพื่อน",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7fcff",
+  "theme_color": "#79c2e9",
+  "icons": [
+    { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
