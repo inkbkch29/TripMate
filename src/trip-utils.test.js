@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseTrip, safeFilePart, tripFilePath } from "./trip-utils";
+import { chooseTrip, distanceMeters, groupNearbyLocations, safeFilePart, tripFilePath } from "./trip-utils";
 
 describe("trip utilities", () => {
   it("creates a trip-scoped private file path", () => {
@@ -11,4 +11,9 @@ describe("trip utilities", () => {
     expect(chooseTrip([], "a")).toBeNull();
   });
   it("sanitizes unsafe path fragments", () => expect(safeFilePart("../../QR Code")).toBe("qr-code"));
+  it("calculates distance and groups friends within 200 metres",()=>{
+    const points=[{user_id:"a",latitude:13.7563,longitude:100.5018},{user_id:"b",latitude:13.7568,longitude:100.5022},{user_id:"c",latitude:13.77,longitude:100.52}];
+    expect(distanceMeters(points[0],points[1])).toBeLessThan(200);
+    expect(groupNearbyLocations(points,200).map((group)=>group.items.length)).toEqual([2,1]);
+  });
 });

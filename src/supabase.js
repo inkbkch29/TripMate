@@ -128,8 +128,14 @@ export async function stopLiveLocation(tripId,userId) {
 }
 
 export function subscribeToLocations(tripId,onChange) {
-  const channel=supabase.channel(`trip-locations-${tripId}`).on("postgres_changes",{event:"*",schema:"public",table:"live_locations",filter:`trip_id=eq.${tripId}`},onChange).subscribe();
+  const channel=supabase.channel(`trip-locations-${tripId}-${crypto.randomUUID()}`).on("postgres_changes",{event:"*",schema:"public",table:"live_locations",filter:`trip_id=eq.${tripId}`},onChange).subscribe();
   return ()=>supabase.removeChannel(channel);
+}
+
+export async function loadLiveLocations(tripId){
+  const {data,error}=await supabase.from("live_locations").select("*").eq("trip_id",tripId).eq("sharing_enabled",true);
+  if(error)throw error;
+  return data||[];
 }
 
 export async function saveStop(tripId, userId, stop) {
