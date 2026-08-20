@@ -62,6 +62,11 @@ export async function revokeTripInvite(inviteId) {
   if (error) throw error;
 }
 
+export async function deleteTripInvite(inviteId) {
+  const { error } = await supabase.rpc("delete_trip_invite",{target_invite:inviteId});
+  if (error) throw error;
+}
+
 export async function removeTripMember(tripId,userId) {
   const { error } = await supabase.rpc("remove_trip_member",{target_trip:tripId,target_user:userId});
   if (error) throw error;
