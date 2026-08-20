@@ -212,6 +212,24 @@ export async function saveTripSettings(tripId, settings) {
   return data;
 }
 
+export async function deleteTrip(tripId) {
+  const { error }=await supabase.from("trips").delete().eq("id",tripId);
+  if (error) throw error;
+}
+
+export async function deleteTripStorage(tripId) {
+  const removeFolder=async(bucket,folder)=>{
+    const {data,error}=await supabase.storage.from(bucket).list(folder,{limit:1000});
+    if(error)throw error;
+    const directFiles=(data||[]).filter((item)=>item.id).map((item)=>`${folder}/${item.name}`);
+    const folders=(data||[]).filter((item)=>!item.id);
+    for(const child of folders)await removeFolder(bucket,`${folder}/${child.name}`);
+    if(directFiles.length){const {error:removeError}=await supabase.storage.from(bucket).remove(directFiles);if(removeError)throw removeError;}
+  };
+  await removeFolder("trip-files",tripId).catch(()=>{});
+  await removeFolder("trip-covers",tripId).catch(()=>{});
+}
+
 export async function saveCollection(tripId, userId, collection) {
   const { error } = await supabase.from("collections").upsert({ id: collection.id, trip_id: tripId, title: collection.title, amount: collection.amount, receiver_id: collection.receiver, due_date: collection.due, created_by: userId });
   if (error) throw error;
