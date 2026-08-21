@@ -37,8 +37,14 @@ export async function getMyTripContext() {
 }
 
 export async function claimInvite(token) {
-  const { data, error } = await supabase.rpc("claim_trip_invite", { invite_token: token });
+  const { data, error } = await supabase.rpc("request_trip_join", { invite_token: token });
   if (error) throw error;
+  return data;
+}
+
+export async function getInviteStatus(token){
+  const {data,error}=await supabase.rpc("get_trip_join_status",{invite_token:token});
+  if(error)throw error;
   return data;
 }
 
@@ -52,9 +58,28 @@ export async function createInvite(tripId, label) {
 }
 
 export async function loadTripInvites(tripId) {
-  const { data, error } = await supabase.from("trip_invites").select("id,label,token,expires_at,claimed_at,revoked_at,created_at").eq("trip_id",tripId).order("created_at",{ascending:false});
+  const { data, error } = await supabase.from("trip_invites").select("id,label,token,expires_at,claimed_at,revoked_at,created_at,is_reusable").eq("trip_id",tripId).order("created_at",{ascending:false});
   if (error) throw error;
   return data || [];
+}
+
+export async function loadTripJoinRequests(tripId){
+  const {data,error}=await supabase.rpc("list_trip_join_requests",{target_trip:tripId});
+  if(error)throw error;
+  return data||[];
+}
+
+export async function reviewTripJoinRequest(requestId,status){
+  const {data,error}=await supabase.rpc("review_trip_join_request",{target_request:requestId,target_status:status});
+  if(error)throw error;
+  return data;
+}
+
+export function subscribeToJoinRequests(tripId,onChange){
+  const channel=supabase.channel(`join-requests-${tripId}-${crypto.randomUUID()}`)
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_join_requests",filter:`trip_id=eq.${tripId}`},onChange)
+    .subscribe();
+  return()=>supabase.removeChannel(channel);
 }
 
 export async function revokeTripInvite(inviteId) {
@@ -79,7 +104,7 @@ async function signedTripFile(path) {
 }
 
 export async function loadTripData(tripId) {
-  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult] = await Promise.all([
+  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult] = await Promise.all([
     supabase.from("trip_members").select("trip_role, profiles(*)").eq("trip_id", tripId),
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
@@ -87,6 +112,8 @@ export async function loadTripData(tripId) {
     supabase.from("live_locations").select("*").eq("trip_id",tripId).eq("sharing_enabled",true),
     supabase.from("trip_settlements").select("*").eq("trip_id",tripId),
     supabase.from("trip_stop_checkins").select("*, trip_stops!inner(trip_id)").eq("trip_stops.trip_id",tripId),
+    supabase.from("trip_location_history").select("user_id,latitude,longitude,recorded_at").eq("trip_id",tripId).order("recorded_at"),
+    supabase.from("trip_route_stats").select("user_id,distance_m").eq("trip_id",tripId),
   ]);
   const failed = [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult].find((result) => result.error);
   if (failed) throw failed.error;
@@ -114,6 +141,8 @@ export async function loadTripData(tripId) {
     locations: locationResult.data,
     settlements: await Promise.all(settlementResult.data.map(async(s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:await signedTripFile(s.slip_path),submittedAt:s.submitted_at}))),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
+    locationHistory: historyResult.error ? [] : (historyResult.data || []),
+    routeDistance: routeStatsResult.error ? 0 : (routeStatsResult.data || []).reduce((sum,item)=>sum+Number(item.distance_m||0),0),
   };
 }
 
@@ -130,6 +159,31 @@ export async function stopLiveLocation(tripId,userId) {
 export function subscribeToLocations(tripId,onChange) {
   const channel=supabase.channel(`trip-locations-${tripId}-${crypto.randomUUID()}`).on("postgres_changes",{event:"*",schema:"public",table:"live_locations",filter:`trip_id=eq.${tripId}`},onChange).subscribe();
   return ()=>supabase.removeChannel(channel);
+}
+
+export function subscribeToTripActivity(tripId,onChange) {
+  const channel=supabase.channel(`trip-activity-${tripId}-${crypto.randomUUID()}`);
+  channel
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_stops",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("plan",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"expenses",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("expense",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"collections",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("collection",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_stop_checkins"},(payload)=>onChange("checkin",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"collection_payments"},(payload)=>onChange("payment",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_members",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("member",payload))
+    .subscribe();
+  return ()=>supabase.removeChannel(channel);
+}
+
+export function subscribeToProfiles(onChange){
+  const channel=supabase.channel(`profile-updates-${crypto.randomUUID()}`)
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},onChange)
+    .subscribe();
+  return ()=>supabase.removeChannel(channel);
+}
+
+export async function cleanupTripLocations(tripId){
+  const {error}=await supabase.rpc("cleanup_trip_locations",{target_trip:tripId});
+  if(error&&error.code!=="42883")throw error;
 }
 
 export async function loadLiveLocations(tripId){
