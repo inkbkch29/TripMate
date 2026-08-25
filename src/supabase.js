@@ -11,10 +11,11 @@ export const isSupabaseConfigured = Boolean(
   !supabaseAnonKey.includes("YOUR_PUBLIC")
 );
 
+const createSupabaseClient=()=>createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+});
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-    })
+  ? (globalThis.__tripmateSupabaseClient||(globalThis.__tripmateSupabaseClient=createSupabaseClient()))
   : null;
 
 export async function getMyTripContext() {
@@ -230,8 +231,11 @@ export async function reviewExpense(expenseId, status, note = "") {
 
 export async function uploadTripFile(tripId, userId, kind, file) {
   if (!file) return { path: "", signedUrl: "" };
+  const allowedTypes={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf"};
+  if(!allowedTypes[file.type])throw new Error("รองรับเฉพาะไฟล์ JPG, PNG, WebP หรือ PDF");
+  if(kind==="payment-qr"&&file.type==="application/pdf")throw new Error("QR รับเงินต้องเป็นไฟล์รูปภาพ");
   if (file.size > 5 * 1024 * 1024) throw new Error("ไฟล์ต้องมีขนาดไม่เกิน 5 MB");
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const extension = allowedTypes[file.type];
   const path = tripFilePath(tripId,userId,kind,extension);
   const { error } = await supabase.storage.from("trip-files").upload(path, file, { upsert: false });
   if (error) throw error;
