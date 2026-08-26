@@ -49,6 +49,12 @@ export async function getInviteStatus(token){
   return data;
 }
 
+export async function loadGuestTrip(token){
+  const {data,error}=await supabase.rpc("guest_trip_snapshot",{invite_token:token});
+  if(error)throw error;
+  return data;
+}
+
 export async function createInvite(tripId, label) {
   const { data, error } = await supabase.rpc("create_trip_invite", {
     target_trip: tripId,
@@ -138,7 +144,7 @@ export async function loadTripData(tripId) {
       }
       return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "" };
     })),
-    collections: await Promise.all(collectionResult.data.map(async(c) => ({ id: c.id, title: c.title, amount: Number(c.amount), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(await Promise.all(c.collection_payments.map(async(p) => [p.user_id, { status: p.status, slipPath: p.slip_url || "", slipUrl:await signedTripFile(p.slip_url) }]))) }))),
+    collections: await Promise.all(collectionResult.data.map(async(c) => ({ id: c.id, title: c.title, amount: Number(c.amount), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(await Promise.all(c.collection_payments.map(async(p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:await signedTripFile(p.slip_url) }]))) }))),
     locations: locationResult.data,
     settlements: await Promise.all(settlementResult.data.map(async(s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:await signedTripFile(s.slip_path),submittedAt:s.submitted_at}))),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
@@ -306,8 +312,8 @@ export async function confirmCollectionPayment(collectionId, memberId) {
   if (error) throw error;
 }
 
-export async function submitCollectionPayment(collectionId,userId,slipPath){
-  const {error}=await supabase.rpc("submit_collection_payment",{target_collection:collectionId,target_slip:slipPath});
+export async function submitCollectionPayment(collectionId,userId,slipPath,paidForUserId=userId){
+  const {error}=await supabase.rpc("submit_collection_payment",{target_collection:collectionId,target_slip:slipPath,target_user:paidForUserId});
   if(error)throw error;
 }
 
