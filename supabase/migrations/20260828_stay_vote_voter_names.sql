@@ -37,7 +37,7 @@ begin
       ) order by o.sort_order, o.id)
       from public.stay_poll_options o
       where o.poll_id = p.id
-    ), '[]'::jsonb)
+    ), '[]'::jsonb))
   into result
   from public.stay_polls p
   join public.trips t on t.id = p.trip_id
@@ -53,4 +53,3 @@ $$;
 
 revoke all on function public.stay_poll_snapshot(uuid) from public;
 grant execute on function public.stay_poll_snapshot(uuid) to anon, authenticated;
-
