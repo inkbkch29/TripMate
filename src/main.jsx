@@ -518,9 +518,10 @@ function TripSettingsDialog({ open, onClose, trip, onSave, onVote, onVoteResults
 }
 
 function friendlyAuthError(message="") {const value=message.toLowerCase();if(value.includes("invalid login credentials"))return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";if(value.includes("already registered")||value.includes("already been registered"))return "อีเมลนี้มีบัญชีแล้ว ลองกด “เข้าสู่ระบบ” ด้านล่าง";if(value.includes("email rate limit"))return "ส่งอีเมลถี่เกินไป กรุณารอสักครู่แล้วลองใหม่";if(value.includes("password"))return "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";return message||"ทำรายการไม่สำเร็จ กรุณาลองอีกครั้ง";}
-function AuthScreen({ inviteToken }) {
-  const [mode, setMode] = useState(inviteToken?"signup":"login"); const [form, setForm] = useState({ name: "", email: "", password: "" }); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(""); const [error, setError] = useState("");const [fieldErrors,setFieldErrors]=useState({});
-  const inviteRedirect=()=>inviteToken?`${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(inviteToken)}`:window.location.origin;
+function AuthScreen({ inviteToken, initialMode="login", returnVote="" }) {
+  const [mode, setMode] = useState(inviteToken?"signup":initialMode); const [form, setForm] = useState({ name: "", email: "", password: "" }); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(""); const [error, setError] = useState("");const [fieldErrors,setFieldErrors]=useState({});
+  const voteRedirect=()=>`${window.location.origin}${window.location.pathname}?vote=${encodeURIComponent(returnVote)}`;
+  const inviteRedirect=()=>inviteToken?`${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(inviteToken)}`:returnVote?voteRedirect():window.location.origin;
   const validateIdentity=({password=true}={})=>{const next={};const email=form.email.trim();if(mode==="signup"&&!form.name.trim())next.name="กรุณาใส่ชื่อที่เพื่อนจำได้";if(!email)next.email="กรุณากรอกอีเมล";else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))next.email="อีเมลยังไม่ครบ เช่น name@gmail.com";if(password&&!form.password)next.password="กรุณาตั้งรหัสผ่าน";else if(password&&form.password.length<6)next.password="รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";setFieldErrors(next);if(Object.keys(next).length)return null;return email;};
   const updateField=(key)=>(event)=>{setForm({...form,[key]:event.target.value});setFieldErrors((old)=>({...old,[key]:""}));setError("");};
   const submit = async () => {
@@ -534,11 +535,13 @@ function AuthScreen({ inviteToken }) {
         if(inviteToken)localStorage.setItem("tripmate-pending-invite",inviteToken);
         const { data, error: authError } = await supabase.auth.signUp({ email, password: form.password, options: { data: { display_name: form.name.trim() },emailRedirectTo:redirectUrl } });
         if (authError) throw authError;
+        if(data.session&&returnVote){window.location.assign(voteRedirect());return;}
         setMessage(data.session ? "สมัครสำเร็จ กำลังเข้าทริป..." : "สมัครสำเร็จ กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ");
       } else {
         if(inviteToken)localStorage.setItem("tripmate-pending-invite",inviteToken);
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password: form.password });
         if (authError) throw authError;
+        if(returnVote){window.location.assign(voteRedirect());return;}
       }
     } catch (err) { setError(friendlyAuthError(err.message)); }
     finally { setBusy(false); }
@@ -598,10 +601,11 @@ function GuestBootstrap({token}){const [data,setData]=useState(null);const [erro
 function StayVoteBootstrap({token}){const [data,setData]=useState(null);const [error,setError]=useState("");const refresh=useCallback(async()=>{try{setData(await loadStayPoll(token));setError("");}catch(err){setError(err.message||"เปิดลิงก์โหวตไม่ได้");}},[token]);useEffect(()=>{refresh();const timer=window.setInterval(refresh,8000);return()=>window.clearInterval(timer);},[refresh]);if(error&&!data)return <ThemeProvider theme={theme}><Box className="auth-shell"><Stack spacing={1.5}><Alert severity="error">{error}</Alert><Button variant="contained" onClick={refresh}>ลองใหม่</Button></Stack></Box></ThemeProvider>;if(!data)return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;return <StayVoteView data={data} token={token} onRefresh={refresh}/>;}
 
 function UserAwareStayVoteBootstrap({token}) {
-  const [ready,setReady]=useState(false);
-  useEffect(()=>{let active=true;(async()=>{try{const {data}=await supabase.auth.getSession();const user=data.session?.user;if(user){const {data:profile}=await supabase.from("profiles").select("display_name").eq("id",user.id).maybeSingle();const displayName=profile?.display_name?.trim()||user.user_metadata?.display_name?.trim();if(displayName)localStorage.setItem("tripmate_vote_name",displayName);}}catch{}finally{if(active)setReady(true);}})();return()=>{active=false;};},[]);
+  const [ready,setReady]=useState(false);const [hasUser,setHasUser]=useState(false);
+  useEffect(()=>{let active=true;(async()=>{try{const {data}=await supabase.auth.getSession();const user=data.session?.user;if(active)setHasUser(Boolean(user));if(user){const {data:profile}=await supabase.from("profiles").select("display_name").eq("id",user.id).maybeSingle();const displayName=profile?.display_name?.trim()||user.user_metadata?.display_name?.trim();if(displayName)localStorage.setItem("tripmate_vote_name",displayName);}}catch{}finally{if(active)setReady(true);}})();return()=>{active=false;};},[]);
   if(!ready)return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;
-  return <StayVoteBootstrap token={token}/>;
+  const target=hasUser?window.location.pathname:`${window.location.pathname}?auth=signup&returnVote=${encodeURIComponent(token)}`;
+  return <><Button className="vote-account-nav" variant="outlined" startIcon={hasUser?<HomeRounded/>:<PersonAddRounded/>} href={target}>{hasUser?"กลับหน้าหลัก":"สมัครสมาชิก"}</Button><StayVoteBootstrap token={token}/></>;
 }
 
 function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, onRefresh }) {
@@ -684,6 +688,7 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
 function ConnectedApp() {
   const [session, setSession] = useState(null); const [account, setAccount] = useState(null); const [selectedTripId,setSelectedTripId]=useState(()=>localStorage.getItem("tripmate-active-trip")||""); const [createOpen,setCreateOpen]=useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState("");const [pendingJoinTripId,setPendingJoinTripId]=useState("");const [pendingJoinStatus,setPendingJoinStatus]=useState("pending");
   const [inviteToken,setInviteToken]=useState(()=>new URLSearchParams(window.location.search).get("invite")||localStorage.getItem("tripmate-pending-invite")||"");
+  const authParams=new URLSearchParams(window.location.search);const initialAuthMode=authParams.get("auth")==="signup"?"signup":"login";const returnVote=authParams.get("returnVote")||"";
   const [claimingInvite,setClaimingInvite]=useState(Boolean(inviteToken));
   const refresh = async () => {
     try { const context = await getMyTripContext(); setAccount(context); setError(""); }
@@ -706,7 +711,7 @@ function ConnectedApp() {
   }, [session?.user?.id, inviteToken, Boolean(account)]);
   useEffect(()=>{if(!session||!account||!inviteToken||!pendingJoinTripId)return;const timer=window.setInterval(()=>getInviteStatus(inviteToken).then(async(result)=>{setPendingJoinStatus(result?.status||"pending");if(result?.status!=="approved")return;const tripId=result.trip_id;localStorage.removeItem("tripmate-pending-invite");window.history.replaceState({},"",window.location.pathname);setInviteToken("");setPendingJoinTripId("");await refresh();setSelectedTripId(tripId);localStorage.setItem("tripmate-active-trip",tripId);}).catch(()=>{}),4000);return()=>window.clearInterval(timer);},[session?.user?.id,Boolean(account),inviteToken,pendingJoinTripId]);
   if (loading || (session && (!account||claimingInvite))) return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;
-  if (!session) return <AuthScreen inviteToken={inviteToken}/>;
+  if (!session) return <AuthScreen inviteToken={inviteToken} initialMode={initialAuthMode} returnVote={returnVote}/>;
   if (error) return <ThemeProvider theme={theme}><Box className="auth-shell"><Stack spacing={1.5}><Alert severity="error">{error}</Alert><Button variant="contained" onClick={refresh}>ลองโหลดใหม่</Button></Stack></Box></ThemeProvider>;
   if (pendingJoinTripId)return <><JoinPendingScreen status={pendingJoinStatus} onRetry={()=>claimInvite(inviteToken).then((result)=>setPendingJoinStatus(result?.status||"pending")).catch((err)=>setError(err.message))} onCreate={()=>setCreateOpen(true)} onLogout={()=>supabase.auth.signOut()}/><CreateTripDialog open={createOpen} onClose={()=>setCreateOpen(false)} user={session.user} onCreated={async(id)=>{await refresh();setSelectedTripId(id);localStorage.setItem("tripmate-active-trip",id);setCreateOpen(false);}}/></>;
   if (!account.trips.length) return <CreateTripScreen user={session.user} onCreated={refresh}/>;
