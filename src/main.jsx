@@ -17,6 +17,7 @@ import {
   PaymentsRounded, PersonAddRounded, PlaceRounded, QrCode2Rounded, ReceiptLongRounded, RouteRounded,
   SavingsRounded, SettingsRounded, StopCircleRounded, TravelExploreRounded, CloudUploadRounded, TaskAltRounded,
   KeyboardArrowUpRounded, KeyboardArrowDownRounded, DoneAllRounded, InstallMobileRounded,
+  KeyboardReturnRounded,
   ExploreRounded, GroupRounded, AccessTimeRounded, DeleteOutlineRounded, AddCircleOutlineRounded,
   DownloadRounded, VisibilityRounded,
   HistoryRounded, RestoreRounded, FileDownloadRounded, WifiOffRounded, HowToVoteRounded,
@@ -605,7 +606,7 @@ function UserAwareStayVoteBootstrap({token}) {
   useEffect(()=>{let active=true;(async()=>{try{const {data}=await supabase.auth.getSession();const user=data.session?.user;if(active)setHasUser(Boolean(user));if(user){const {data:profile}=await supabase.from("profiles").select("display_name").eq("id",user.id).maybeSingle();const displayName=profile?.display_name?.trim()||user.user_metadata?.display_name?.trim();if(displayName)localStorage.setItem("tripmate_vote_name",displayName);}}catch{}finally{if(active)setReady(true);}})();return()=>{active=false;};},[]);
   if(!ready)return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;
   const target=hasUser?window.location.pathname:`${window.location.pathname}?auth=signup&returnVote=${encodeURIComponent(token)}`;
-  return <><Button className="vote-account-nav" variant="outlined" startIcon={hasUser?<HomeRounded/>:<PersonAddRounded/>} href={target}>{hasUser?"กลับหน้าหลัก":"สมัครสมาชิก"}</Button><StayVoteBootstrap token={token}/></>;
+  return <><StayVoteBootstrap token={token}/><Box className="vote-bottom-nav"><Button fullWidth startIcon={<KeyboardReturnRounded/>} href={target}>{hasUser?"กลับหน้าหลัก":"สมัครสมาชิก"}</Button></Box></>;
 }
 
 function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, onRefresh }) {
