@@ -587,6 +587,13 @@ function GuestView({data,token}){
 function GuestBootstrap({token}){const [data,setData]=useState(null);const [error,setError]=useState("");useEffect(()=>{loadGuestTrip(token).then(setData).catch((err)=>setError(err.message||"เปิดทริปไม่ได้"));},[token]);if(error)return <ThemeProvider theme={theme}><Box className="auth-shell"><Alert severity="error">{error}</Alert></Box></ThemeProvider>;if(!data)return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;return <GuestView data={data} token={token}/>;}
 function StayVoteBootstrap({token}){const [data,setData]=useState(null);const [error,setError]=useState("");const refresh=useCallback(async()=>{try{setData(await loadStayPoll(token));setError("");}catch(err){setError(err.message||"เปิดลิงก์โหวตไม่ได้");}},[token]);useEffect(()=>{refresh();const timer=window.setInterval(refresh,8000);return()=>window.clearInterval(timer);},[refresh]);if(error&&!data)return <ThemeProvider theme={theme}><Box className="auth-shell"><Stack spacing={1.5}><Alert severity="error">{error}</Alert><Button variant="contained" onClick={refresh}>ลองใหม่</Button></Stack></Box></ThemeProvider>;if(!data)return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;return <StayVoteView data={data} token={token} onRefresh={refresh}/>;}
 
+function UserAwareStayVoteBootstrap({token}) {
+  const [ready,setReady]=useState(false);
+  useEffect(()=>{let active=true;(async()=>{try{const {data}=await supabase.auth.getSession();const user=data.session?.user;if(user){const {data:profile}=await supabase.from("profiles").select("display_name").eq("id",user.id).maybeSingle();const displayName=profile?.display_name?.trim()||user.user_metadata?.display_name?.trim();if(displayName)localStorage.setItem("tripmate_vote_name",displayName);}}catch{}finally{if(active)setReady(true);}})();return()=>{active=false;};},[]);
+  if(!ready)return <ThemeProvider theme={theme}><LoadingScreen/></ThemeProvider>;
+  return <StayVoteBootstrap token={token}/>;
+}
+
 function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, onRefresh }) {
   const demoMode=new URLSearchParams(window.location.search).get("demo")==="1";
   const resetMock=()=>{["tripmate-members","tripmate-stops","tripmate-expenses","tripmate-collections","tripmate-settlements","tripmate-checkins"].forEach((key)=>localStorage.removeItem(key));window.location.reload();};
@@ -699,5 +706,5 @@ function ConnectedApp() {
 
 const appRoot = window.__tripMateRoot || (window.__tripMateRoot = createRoot(document.getElementById("root")));
 const queryParams=new URLSearchParams(window.location.search);const previewDemo=queryParams.get("demo")==="1";const guestToken=queryParams.get("guest");const voteToken=queryParams.get("vote");
-appRoot.render(<React.StrictMode>{isSupabaseConfigured&&voteToken?<StayVoteBootstrap token={voteToken}/>:isSupabaseConfigured&&guestToken?<GuestBootstrap token={guestToken}/>:isSupabaseConfigured && !previewDemo ? <ConnectedApp/> : <App/>}</React.StrictMode>);
+appRoot.render(<React.StrictMode>{isSupabaseConfigured&&voteToken?<UserAwareStayVoteBootstrap token={voteToken}/>:isSupabaseConfigured&&guestToken?<GuestBootstrap token={guestToken}/>:isSupabaseConfigured && !previewDemo ? <ConnectedApp/> : <App/>}</React.StrictMode>);
 if("serviceWorker" in navigator&&import.meta.env.PROD)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
