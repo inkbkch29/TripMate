@@ -60,6 +60,7 @@ export async function castStayVote(token,voter,optionIds){const {error}=await su
 export async function createStayPoll(tripId,title,options){const {data,error}=await supabase.rpc("create_stay_poll",{target_trip:tripId,poll_title:title,poll_options:options});if(error)throw error;return data;}
 export async function listStayPolls(tripId){const {data,error}=await supabase.rpc("list_stay_polls",{target_trip:tripId});if(error)throw error;return data||[];}
 export async function updateStayPoll(token,title,status,options){const {error}=await supabase.rpc("update_stay_poll",{poll_token:token,poll_title:title,poll_status:status,poll_options:options});if(error)throw error;return true;}
+export async function resetStayPollVotes(token){const {error}=await supabase.rpc("reset_stay_poll_votes",{poll_token:token});if(error)throw error;return true;}
 
 export async function createInvite(tripId, label) {
   const { data, error } = await supabase.rpc("create_trip_invite", {
