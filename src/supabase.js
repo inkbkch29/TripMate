@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { tripFilePath } from "./trip-utils";
+import { compressImage } from "./image-utils";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -61,6 +62,7 @@ export async function createStayPoll(tripId,title,options){const {data,error}=aw
 export async function listStayPolls(tripId){const {data,error}=await supabase.rpc("list_stay_polls",{target_trip:tripId});if(error)throw error;return data||[];}
 export async function updateStayPoll(token,title,status,options){const {error}=await supabase.rpc("update_stay_poll",{poll_token:token,poll_title:title,poll_status:status,poll_options:options});if(error)throw error;return true;}
 export async function resetStayPollVotes(token){const {error}=await supabase.rpc("reset_stay_poll_votes",{poll_token:token});if(error)throw error;return true;}
+export async function selectStayPollWinner(token,optionId){const {error}=await supabase.rpc("select_stay_poll_winner",{poll_token:token,option_id:optionId});if(error)throw error;return true;}
 
 export async function createInvite(tripId, label) {
   const { data, error } = await supabase.rpc("create_trip_invite", {
@@ -184,6 +186,7 @@ export function subscribeToTripActivity(tripId,onChange) {
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_stop_checkins"},(payload)=>onChange("checkin",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"collection_payments"},(payload)=>onChange("payment",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_members",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("member",payload))
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"trip_activity_log",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("activity",payload))
     .subscribe();
   return ()=>supabase.removeChannel(channel);
 }
@@ -212,7 +215,7 @@ export async function saveStop(tripId, userId, stop) {
 }
 
 export async function deleteStop(tripId,stopId){
-  const {error}=await supabase.from("trip_stops").delete().eq("trip_id",tripId).eq("id",stopId);
+  const {error}=await supabase.rpc("delete_trip_item",{target_trip:tripId,target_type:"stop",target_id:stopId});
   if(error)throw error;
 }
 
@@ -247,10 +250,11 @@ export async function uploadTripFile(tripId, userId, kind, file) {
   const allowedTypes={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf"};
   if(!allowedTypes[file.type])throw new Error("รองรับเฉพาะไฟล์ JPG, PNG, WebP หรือ PDF");
   if(kind==="payment-qr"&&file.type==="application/pdf")throw new Error("QR รับเงินต้องเป็นไฟล์รูปภาพ");
-  if (file.size > 5 * 1024 * 1024) throw new Error("ไฟล์ต้องมีขนาดไม่เกิน 5 MB");
-  const extension = allowedTypes[file.type];
+  if (file.size > 15 * 1024 * 1024) throw new Error("ไฟล์ต้นฉบับต้องมีขนาดไม่เกิน 15 MB");
+  const uploadFile=file.type==="application/pdf"?file:await compressImage(file,{maxWidth:kind==="payment-qr"?1800:1600,maxHeight:kind==="payment-qr"?1800:1600,quality:kind==="payment-qr"?.9:.84});
+  const extension = allowedTypes[uploadFile.type];
   const path = tripFilePath(tripId,userId,kind,extension);
-  const { error } = await supabase.storage.from("trip-files").upload(path, file, { upsert: false });
+  const { error } = await supabase.storage.from("trip-files").upload(path, uploadFile, { upsert: false,contentType:uploadFile.type });
   if (error) throw error;
   const { data } = await supabase.storage.from("trip-files").createSignedUrl(path, 3600);
   return { path, signedUrl: data?.signedUrl || "" };
@@ -262,23 +266,30 @@ export async function deleteTripFile(path) {
   if (error) throw error;
 }
 
-export async function deleteExpense(expenseId) {
-  const { error }=await supabase.from("expenses").delete().eq("id",expenseId);
+export async function deleteExpense(tripId,expenseId) {
+  if(!expenseId){expenseId=tripId;const {data,error:lookupError}=await supabase.from("expenses").select("trip_id").eq("id",expenseId).single();if(lookupError)throw lookupError;tripId=data.trip_id;}
+  const { error }=await supabase.rpc("delete_trip_item",{target_trip:tripId,target_type:"expense",target_id:expenseId});
   if (error) throw error;
 }
 
-export async function deleteCollection(collectionId) {
-  const { error }=await supabase.from("collections").delete().eq("id",collectionId);
+export async function deleteCollection(tripId,collectionId) {
+  if(!collectionId){collectionId=tripId;const {data,error:lookupError}=await supabase.from("collections").select("trip_id").eq("id",collectionId).single();if(lookupError)throw lookupError;tripId=data.trip_id;}
+  const { error }=await supabase.rpc("delete_trip_item",{target_trip:tripId,target_type:"collection",target_id:collectionId});
   if (error) throw error;
 }
+
+export async function loadTripActivity(tripId){const {data,error}=await supabase.from("trip_activity_log").select("*").eq("trip_id",tripId).order("created_at",{ascending:false}).limit(100);if(error)throw error;return data||[];}
+export async function loadTripTrash(tripId){const {data,error}=await supabase.from("trip_trash").select("id,item_type,item_id,label,deleted_at,expires_at").eq("trip_id",tripId).gt("expires_at",new Date().toISOString()).order("deleted_at",{ascending:false});if(error)throw error;return data||[];}
+export async function restoreTripItem(trashId){const {error}=await supabase.rpc("restore_trip_item",{target_trash:trashId});if(error)throw error;return true;}
 
 export async function uploadTripCover(tripId,file) {
   if (!file) return "";
   if (!["image/jpeg","image/png","image/webp"].includes(file.type)) throw new Error("ภาพปกรองรับ JPG, PNG หรือ WebP");
-  if (file.size>5*1024*1024) throw new Error("ภาพปกต้องมีขนาดไม่เกิน 5 MB");
-  const extension=file.name.split(".").pop()?.toLowerCase()||"jpg";
+  if (file.size>15*1024*1024) throw new Error("ภาพปกต้นฉบับต้องมีขนาดไม่เกิน 15 MB");
+  const uploadFile=await compressImage(file,{maxWidth:1800,maxHeight:1100,quality:.84});
+  const extension=uploadFile.type==="image/webp"?"webp":"jpg";
   const path=`${tripId}/cover-${Date.now()}-${crypto.randomUUID()}.${extension}`;
-  const { error }=await supabase.storage.from("trip-covers").upload(path,file,{upsert:false,cacheControl:"3600"});
+  const { error }=await supabase.storage.from("trip-covers").upload(path,uploadFile,{upsert:false,cacheControl:"3600",contentType:uploadFile.type});
   if (error) throw error;
   return supabase.storage.from("trip-covers").getPublicUrl(path).data.publicUrl;
 }
