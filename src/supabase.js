@@ -19,17 +19,22 @@ export const supabase = isSupabaseConfigured
   ? (globalThis.__tripmateSupabaseClient||(globalThis.__tripmateSupabaseClient=createSupabaseClient()))
   : null;
 
+const withTimeout=(promise,ms=12000,message="การเชื่อมต่อใช้เวลานานเกินไป")=>Promise.race([
+  Promise.resolve(promise),
+  new Promise((_,reject)=>setTimeout(()=>reject(new Error(message)),ms)),
+]);
+
 export async function getMyTripContext() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { user: null, profile: null, trips: [] };
 
-  const [{ data: profile }, { data: memberships, error }] = await Promise.all([
+  const [{ data: profile }, { data: memberships, error }] = await withTimeout(Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase
       .from("trip_members")
       .select("trip_role, trips(*)")
       .eq("user_id", user.id),
-  ]);
+  ]),10000,"โหลดบัญชีช้าเกินไป กรุณาลองอีกครั้ง");
   if (error) throw error;
   return {
     user,
@@ -121,7 +126,7 @@ async function signedTripFile(path) {
 }
 
 export async function loadTripData(tripId) {
-  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult] = await Promise.all([
+  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult] = await withTimeout(Promise.all([
     supabase.from("trip_members").select("trip_role, profiles(*)").eq("trip_id", tripId),
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
@@ -131,32 +136,36 @@ export async function loadTripData(tripId) {
     supabase.from("trip_stop_checkins").select("*, trip_stops!inner(trip_id)").eq("trip_stops.trip_id",tripId),
     supabase.from("trip_location_history").select("user_id,latitude,longitude,recorded_at").eq("trip_id",tripId).order("recorded_at"),
     supabase.from("trip_route_stats").select("user_id,distance_m").eq("trip_id",tripId),
-  ]);
+  ]),12000,"โหลดข้อมูลทริปช้าเกินไป กรุณาลองใหม่");
   const failed = [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult].find((result) => result.error);
   if (failed) throw failed.error;
-  const members = await Promise.all(memberResult.data.map(async ({ trip_role, profiles: p }, index) => {
-    let paymentQr = "";
-    if (p.payment_qr_path) {
-      const { data } = await supabase.storage.from("trip-files").createSignedUrl(p.payment_qr_path, 3600);
-      paymentQr = data?.signedUrl || "";
-    }
+  const filePaths=[
+    ...memberResult.data.map(({profiles:p})=>p.payment_qr_path),
+    ...expenseResult.data.map((item)=>item.receipt_path),
+    ...collectionResult.data.flatMap((item)=>item.collection_payments.map((payment)=>payment.slip_url)),
+    ...settlementResult.data.map((item)=>item.slip_path),
+  ].filter(Boolean);
+  const uniquePaths=[...new Set(filePaths)];
+  const signedByPath={};
+  if(uniquePaths.length){
+    const {data:signedRows}=await withTimeout(supabase.storage.from("trip-files").createSignedUrls(uniquePaths,3600),8000,"โหลดรูปประกอบช้าเกินไป").catch(()=>({data:[]}));
+    (signedRows||[]).forEach((row,index)=>{signedByPath[row.path||uniquePaths[index]]=row.signedUrl||row.signedURL||"";});
+  }
+  const members = memberResult.data.map(({ trip_role, profiles: p }, index) => {
+    const paymentQr = signedByPath[p.payment_qr_path]||"";
     const roleLabels={owner:"เจ้าของทริป",planner:"ผู้ดูแลแพลน",treasurer:"เหรัญญิก",member:"สมาชิก"};
     return { id: p.id, name: p.display_name, avatar: p.avatar_url, promptpay: p.promptpay_id || "", bankName: p.bank_name || "", accountName: p.account_name || "", paymentQr, paymentQrPath: p.payment_qr_path || "", tripRole:trip_role, role:roleLabels[trip_role]||"สมาชิก", color: ["#86c9ed","#e8cf88","#a8daf3","#ddc173","#c8eaff"][index % 5], emoji: "🙂", online: false };
-  }));
+  });
   return {
     members,
     stops: stopResult.data.map((s) => ({ id: s.id, day: s.day_number, time: s.start_time?.slice(0,5) || "", title: s.title, place: s.place_name, note: s.note || "", latitude:s.latitude, longitude:s.longitude, googleMapsUrl:s.google_maps_url||"", sortOrder:s.sort_order, done: s.is_done })),
-    expenses: await Promise.all(expenseResult.data.map(async (e) => {
-      let receiptUrl = "";
-      if (e.receipt_path) {
-        const { data } = await supabase.storage.from("trip-files").createSignedUrl(e.receipt_path, 3600);
-        receiptUrl = data?.signedUrl || "";
-      }
+    expenses: expenseResult.data.map((e) => {
+      const receiptUrl = signedByPath[e.receipt_path]||"";
       return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "" };
-    })),
-    collections: await Promise.all(collectionResult.data.map(async(c) => ({ id: c.id, title: c.title, amount: Number(c.amount), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(await Promise.all(c.collection_payments.map(async(p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:await signedTripFile(p.slip_url) }]))) }))),
+    }),
+    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, amount: Number(c.amount), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
-    settlements: await Promise.all(settlementResult.data.map(async(s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:await signedTripFile(s.slip_path),submittedAt:s.submitted_at}))),
+    settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
     locationHistory: historyResult.error ? [] : (historyResult.data || []),
     routeDistance: routeStatsResult.error ? 0 : (routeStatsResult.data || []).reduce((sum,item)=>sum+Number(item.distance_m||0),0),
