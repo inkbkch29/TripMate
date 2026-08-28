@@ -21,6 +21,7 @@ import {
   DownloadRounded, VisibilityRounded,
 } from "@mui/icons-material";
 import { calculateBalances, simplifyDebts, splitAmount } from "./finance";
+import { compressProfileImage } from "./image-utils";
 import { castStayVote, claimInvite, cleanupTripLocations, confirmCollectionPayment, createInvite, createStayPoll, deleteCollection, deleteExpense, deleteStop, deleteTrip, deleteTripFile, deleteTripStorage, getInviteStatus, getMyTripContext, isSupabaseConfigured, listStayPolls, loadGuestTrip, loadLiveLocations, loadStayPoll, loadTripData, loadTripInvites, loadTripJoinRequests, removeTripMember, reorderTripStops, reviewExpense, reviewSettlement, reviewTripJoinRequest, revokeTripInvite, saveCollection, saveExpense, saveLiveLocation, saveStop, saveTripSettings, setStopCheckin, stopLiveLocation, submitCollectionPayment, submitSettlement, subscribeToJoinRequests, subscribeToLocations, subscribeToProfiles, subscribeToTripActivity, supabase, toggleTripStopDone, resetStayPollVotes, updateStayPoll, updateTripMemberRole, uploadTripCover, uploadTripFile } from "./supabase";
 import { chooseTrip, distanceMeters, groupNearbyLocations } from "./trip-utils";
 import "leaflet/dist/leaflet.css";
@@ -360,17 +361,19 @@ function Profile({ members, setMembers, onAddMember, toast, account, activeTrip,
     const input = event.target; const file = input.files?.[0];
     if (!file) return;
     if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { input.value=""; return toast("รองรับเฉพาะ JPG, PNG หรือ WebP", "error"); }
-    if (file.size > 2 * 1024 * 1024) { input.value=""; return toast("รูปต้องมีขนาดไม่เกิน 2 MB", "error"); }
-    if (!account) {
-      const reader = new FileReader();
-      reader.onload = () => setMembers((old) => old.map((m, i) => i === meIndex ? { ...m, avatar: reader.result } : m));
-      reader.readAsDataURL(file); input.value=""; return;
-    }
+    if (file.size > 15 * 1024 * 1024) { input.value=""; return toast("ไฟล์ต้นฉบับต้องมีขนาดไม่เกิน 15 MB", "error"); }
     setBusy(true);
     try {
-      const extension = file.type.split("/")[1].replace("jpeg","jpg");
+      const compressedFile = await compressProfileImage(file);
+      if (!account) {
+        const reader = new FileReader();
+        reader.onload = () => setMembers((old) => old.map((m, i) => i === meIndex ? { ...m, avatar: reader.result } : m));
+        reader.readAsDataURL(compressedFile);
+        return;
+      }
+      const extension = compressedFile.type.split("/")[1].replace("jpeg","jpg");
       const path = `${account.user.id}/avatar-${Date.now()}.${extension}`;
-      const { error: uploadError } = await supabase.storage.from("avatars").upload(path,file,{cacheControl:"3600",upsert:false});
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(path,compressedFile,{cacheControl:"3600",upsert:false,contentType:compressedFile.type});
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(path);
       if (!publicData?.publicUrl) throw new Error("สร้าง URL รูปโปรไฟล์ไม่สำเร็จ");
