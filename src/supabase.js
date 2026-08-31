@@ -63,10 +63,10 @@ export async function loadGuestTrip(token){
 
 export async function loadStayPoll(token){const {data,error}=await supabase.rpc("stay_poll_snapshot",{poll_token:token});if(error)throw error;return data;}
 export async function castStayVote(token,voter,optionIds){const {error}=await supabase.rpc("cast_stay_vote",{poll_token:token,voter,option_ids:optionIds});if(error)throw error;return true;}
-export async function createStayPoll(tripId,title,options){const {data,error}=await supabase.rpc("create_stay_poll",{target_trip:tripId,poll_title:title,poll_options:options});if(error)throw error;return data;}
+export async function createStayPoll(tripId,title,options,pollType="stay",autoClose=true){const {data,error}=await supabase.rpc("create_stay_poll",{target_trip:tripId,poll_title:title,poll_options:options});if(error)throw error;const {error:configError}=await supabase.rpc("configure_trip_poll",{poll_token:data,target_type:pollType,should_auto_close:autoClose});if(configError)throw configError;return data;}
 export async function listStayPolls(tripId){const {data,error}=await supabase.rpc("list_stay_polls",{target_trip:tripId});if(error)throw error;return data||[];}
 export async function listTripVoteLinks(tripId){const {data,error}=await supabase.rpc("list_trip_vote_links",{target_trip:tripId});if(error)throw error;return data||[];}
-export async function updateStayPoll(token,title,status,options){const {error}=await supabase.rpc("update_stay_poll",{poll_token:token,poll_title:title,poll_status:status,poll_options:options});if(error)throw error;return true;}
+export async function updateStayPoll(token,title,status,options,pollType="stay",autoClose=true){const {error}=await supabase.rpc("update_stay_poll",{poll_token:token,poll_title:title,poll_status:status,poll_options:options});if(error)throw error;const {error:configError}=await supabase.rpc("configure_trip_poll",{poll_token:token,target_type:pollType,should_auto_close:autoClose});if(configError)throw configError;return true;}
 export async function resetStayPollVotes(token){const {error}=await supabase.rpc("reset_stay_poll_votes",{poll_token:token});if(error)throw error;return true;}
 export async function selectStayPollWinner(token,optionId){const {error}=await supabase.rpc("select_stay_poll_winner",{poll_token:token,option_id:optionId});if(error)throw error;return true;}
 
