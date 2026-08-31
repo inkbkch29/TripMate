@@ -163,7 +163,7 @@ export async function loadTripData(tripId) {
       const receiptUrl = signedByPath[e.receipt_path]||"";
       return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "" };
     }),
-    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, amount: Number(c.amount), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
+    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
     settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
@@ -329,7 +329,7 @@ export async function deleteTripStorage(tripId) {
 }
 
 export async function saveCollection(tripId, userId, collection) {
-  const { error } = await supabase.from("collections").upsert({ id: collection.id, trip_id: tripId, title: collection.title, amount: collection.amount, receiver_id: collection.receiver, due_date: collection.due, created_by: userId });
+  const { error } = await supabase.from("collections").upsert({ id: collection.id, trip_id: tripId, title: collection.title, amount: collection.amount, original_amount:collection.originalAmount??collection.amount, fund_remainder:collection.fundRemainder||0, is_fund:Boolean(collection.isFund), receiver_id: collection.receiver, due_date: collection.due, created_by: userId });
   if (error) throw error;
   const { error: paymentError } = await supabase.rpc("replace_collection_payments",{target_collection:collection.id,target_users:collection.participants,target_amount:collection.perPerson,target_paid:collection.paid||[]});
   if (paymentError) throw paymentError;
