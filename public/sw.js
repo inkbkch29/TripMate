@@ -1,4 +1,4 @@
-const CACHE="tripmate-v3";
+const CACHE="tripmate-v4";
 const APP_SHELL=["/","/manifest.webmanifest","/app-icon-192.png","/app-icon-512.png","/apple-touch-icon.png"];
 
 self.addEventListener("install",(event)=>{
@@ -29,4 +29,9 @@ self.addEventListener("fetch",(event)=>{
   })));
 });
 self.addEventListener("message",(event)=>{if(event.data?.type!=="SHOW_NOTIFICATION")return;const {title="TripMate",body="มีรายการใหม่ที่ต้องตรวจสอบ"}=event.data;event.waitUntil(self.registration.showNotification(title,{body,icon:"/app-icon-192.png",badge:"/app-icon-192.png",tag:"tripmate-update",data:{url:"/"}}));});
+self.addEventListener("push",(event)=>{
+  let payload={title:"TripMate",body:"มีอัปเดตใหม่จากทริป",url:"/",tag:"tripmate-push"};
+  try{if(event.data)payload={...payload,...event.data.json()};}catch{if(event.data)payload.body=event.data.text();}
+  event.waitUntil(self.registration.showNotification(payload.title,{body:payload.body,icon:"/app-icon-192.png",badge:"/app-icon-192.png",tag:payload.tag,data:{url:payload.url||"/"}}));
+});
 self.addEventListener("notificationclick",(event)=>{event.notification.close();event.waitUntil(clients.matchAll({type:"window",includeUncontrolled:true}).then((windows)=>{const existing=windows[0];if(existing){existing.focus();return existing.navigate(event.notification.data?.url||"/");}return clients.openWindow(event.notification.data?.url||"/");}));});

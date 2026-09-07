@@ -177,6 +177,26 @@ export async function saveLiveLocation(tripId,userId,coords) {
   if(error) throw error;
 }
 
+export async function savePushSubscription(subscription){
+  const {data:{user}}=await supabase.auth.getUser();
+  if(!user)throw new Error("กรุณาเข้าสู่ระบบก่อนเปิดการแจ้งเตือน");
+  const json=subscription.toJSON();
+  const {error}=await supabase.from("push_subscriptions").upsert({
+    user_id:user.id,
+    endpoint:json.endpoint,
+    p256dh:json.keys?.p256dh,
+    auth:json.keys?.auth,
+    user_agent:navigator.userAgent,
+    updated_at:new Date().toISOString(),
+  },{onConflict:"endpoint"});
+  if(error)throw error;
+}
+
+export async function sendLocationPush(tripId,eventType,distance=0){
+  const {error}=await supabase.functions.invoke("send-location-push",{body:{tripId,eventType,distanceMeters:distance}});
+  if(error)throw error;
+}
+
 export async function stopLiveLocation(tripId,userId) {
   const {error}=await supabase.from("live_locations").update({sharing_enabled:false,updated_at:new Date().toISOString()}).eq("trip_id",tripId).eq("user_id",userId);
   if(error) throw error;
