@@ -716,13 +716,13 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
   const showToast = (text, severity = "success") => setToast({ open: true, text, severity });
   useEffect(()=>{
     const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
-    const dismissed=localStorage.getItem("tripmate-notification-prompt-dismissed")==="true";
+    const dismissed=localStorage.getItem("tripmate-web-push-prompt-dismissed")==="true";
     if(standalone&&"Notification" in window&&Notification.permission==="default"&&!dismissed){
       const timer=window.setTimeout(()=>setNotificationPromptOpen(true),900);
       return()=>window.clearTimeout(timer);
     }
   },[]);
-  const closeNotificationPrompt=()=>{localStorage.setItem("tripmate-notification-prompt-dismissed","true");setNotificationPromptOpen(false);};
+  const closeNotificationPrompt=()=>{localStorage.setItem("tripmate-web-push-prompt-dismissed","true");setNotificationPromptOpen(false);};
   const ensurePushSubscription=async()=>{
     if(!account||!("serviceWorker" in navigator))return;
     const registration=await navigator.serviceWorker.ready;
@@ -735,7 +735,7 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
     try{
       const permission=await Notification.requestPermission();
       if(permission==="granted")await ensurePushSubscription();
-      localStorage.setItem("tripmate-notification-prompt-dismissed","true");
+      localStorage.setItem("tripmate-web-push-prompt-dismissed","true");
       setNotificationPromptOpen(false);
       showToast(permission==="granted"?"เปิดการแจ้งเตือนแล้ว":"ยังไม่ได้อนุญาตการแจ้งเตือน",permission==="granted"?"success":"info");
     }catch{
