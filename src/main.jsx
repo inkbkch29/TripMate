@@ -644,6 +644,7 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
   const [pendingJoinRequests,setPendingJoinRequests]=useState([]);
   const [locationSharing,setLocationSharing]=useState(false);const [locationBusy,setLocationBusy]=useState(false);const [locationResumeSuggested,setLocationResumeSuggested]=useState(false);
   const locationWatchRef=useRef(null);const lastLocationSentRef=useRef(0);
+  const friendLocationRef=useRef(new Map());const friendMovementNoticeRef=useRef(new Map());
   const [installPrompt,setInstallPrompt]=useState(null);
   const [notificationPromptOpen,setNotificationPromptOpen]=useState(false);
   useEffect(() => { const timer = setTimeout(() => setLoading(false), 850); return () => clearTimeout(timer); }, []);
@@ -658,7 +659,53 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
   }, [activeTrip?.id]);
   useEffect(()=>{if(!activeTrip?.id||!account){setVoteLinks([]);return;}listTripVoteLinks(activeTrip.id).then(setVoteLinks).catch(()=>setVoteLinks([]));},[activeTrip?.id,account?.user.id]);
   useEffect(()=>{if(!activeTrip?.id||!account||!canInvite){setPendingJoinRequests([]);return;}let mounted=true;const refresh=()=>loadTripJoinRequests(activeTrip.id).then((rows)=>{if(mounted)setPendingJoinRequests(rows.filter((item)=>item.status==="pending"));}).catch(()=>{});const unsubscribe=subscribeToJoinRequests(activeTrip.id,(payload)=>{refresh();if(payload.eventType!=="INSERT")return;showToast("มีคำขอเข้าร่วมทริปใหม่","info");if("Notification" in window&&Notification.permission==="granted")navigator.serviceWorker?.ready.then((registration)=>registration.active?.postMessage({type:"SHOW_NOTIFICATION",title:activeTrip.name||"TripMate",body:"มีเพื่อนส่งคำขอเข้าร่วมทริป"})).catch(()=>{});});refresh();return()=>{mounted=false;unsubscribe();};},[activeTrip?.id,account?.user.id,canInvite]);
-  useEffect(()=>{if(!activeTrip||!account)return;let mounted=true;const refresh=()=>loadLiveLocations(activeTrip.id).then((rows)=>{if(mounted)setLocations(rows);}).catch(()=>{});const unsubscribe=subscribeToLocations(activeTrip.id,(payload)=>{const row=payload.new;if(payload.eventType==="DELETE")setLocations((old)=>old.filter((item)=>item.user_id!==payload.old.user_id));else if(row?.trip_id===activeTrip.id){setLocations((old)=>row.sharing_enabled?[...old.filter((item)=>item.user_id!==row.user_id),row]:old.filter((item)=>item.user_id!==row.user_id));if(!row.sharing_enabled&&row.user_id!==account.user.id){const member=members.find((item)=>item.id===row.user_id);setLiveAlerts((old)=>[{type:"location",severity:"info",text:`${member?.name||"เพื่อน"} หยุดแชร์ตำแหน่งแล้ว`,at:Date.now()},...old].slice(0,8));}}});const timer=window.setInterval(refresh,5000);const onVisible=()=>{if(document.visibilityState==="visible")refresh();};document.addEventListener("visibilitychange",onVisible);refresh();return()=>{mounted=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible);unsubscribe();};},[activeTrip?.id,account?.user.id,members.length]);
+  useEffect(()=>{
+    if(!activeTrip||!account)return;
+    let mounted=true;
+    friendLocationRef.current=new Map();
+    friendMovementNoticeRef.current=new Map();
+    const refresh=()=>loadLiveLocations(activeTrip.id).then((rows)=>{
+      if(!mounted)return;
+      setLocations(rows);
+      rows.forEach((row)=>{if(!friendLocationRef.current.has(row.user_id))friendLocationRef.current.set(row.user_id,row);});
+    }).catch(()=>{});
+    const addLocationAlert=(text)=>setLiveAlerts((old)=>[{type:"location",severity:"info",text,at:Date.now()},...old].slice(0,8));
+    const unsubscribe=subscribeToLocations(activeTrip.id,(payload)=>{
+      const row=payload.new;
+      const deletedUserId=payload.old?.user_id;
+      if(payload.eventType==="DELETE"){
+        friendLocationRef.current.delete(deletedUserId);
+        setLocations((old)=>old.filter((item)=>item.user_id!==deletedUserId));
+        return;
+      }
+      if(row?.trip_id!==activeTrip.id)return;
+      const previous=friendLocationRef.current.get(row.user_id);
+      friendLocationRef.current.set(row.user_id,row);
+      setLocations((old)=>row.sharing_enabled?[...old.filter((item)=>item.user_id!==row.user_id),row]:old.filter((item)=>item.user_id!==row.user_id));
+      if(row.user_id===account.user.id)return;
+      const member=members.find((item)=>item.id===row.user_id);
+      const name=member?.name||"เพื่อน";
+      if(!row.sharing_enabled){
+        if(previous?.sharing_enabled)addLocationAlert(`${name} หยุดแชร์ตำแหน่งแล้ว`);
+        return;
+      }
+      if(!previous||previous.sharing_enabled===false){
+        addLocationAlert(`${name} เปิด TripMate และเริ่มแชร์ตำแหน่งแล้ว`);
+        return;
+      }
+      const moved=distanceMeters(previous,row)||0;
+      const lastNotice=friendMovementNoticeRef.current.get(row.user_id)||0;
+      if(moved>=100&&Date.now()-lastNotice>=5*60*1000){
+        friendMovementNoticeRef.current.set(row.user_id,Date.now());
+        addLocationAlert(`${name} กำลังเคลื่อนที่ · ขยับจากจุดล่าสุด ${moved>=1000?`${(moved/1000).toFixed(1)} กม.`:`${Math.round(moved)} ม.`}`);
+      }
+    });
+    const timer=window.setInterval(refresh,5000);
+    const onVisible=()=>{if(document.visibilityState==="visible")refresh();};
+    document.addEventListener("visibilitychange",onVisible);
+    refresh();
+    return()=>{mounted=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible);unsubscribe();};
+  },[activeTrip?.id,account?.user.id,members.length]);
   useEffect(()=>{if(!activeTrip||!account)return;let refreshTimer;const unsubscribe=subscribeToTripActivity(activeTrip.id,(type,payload)=>{if(type==="plan"&&payload.new?.created_by!==account.user.id)setLiveAlerts((old)=>[{type:"plan",text:"แผนการเดินทางถูกแก้ไขแล้ว",at:Date.now()},...old].slice(0,8));window.clearTimeout(refreshTimer);refreshTimer=window.setTimeout(()=>loadTripData(activeTrip.id).then((data)=>{setMembers(data.members);setStops(data.stops);setExpenses(data.expenses);setCollections(data.collections);setCheckins(data.checkins||[]);setLocationHistory(data.locationHistory||[]);setRouteDistanceTotal(data.routeDistance||0);}).catch(()=>{}),450);});return()=>{window.clearTimeout(refreshTimer);unsubscribe();};},[activeTrip?.id,account?.user.id]);
   useEffect(()=>{if(!account)return subscribeToProfiles((payload)=>{const profile=payload.new;if(!profile?.id)return;setMembers((old)=>old.map((member)=>member.id===profile.id?{...member,name:profile.display_name||member.name,avatar:profile.avatar_url||"",accountName:profile.account_name||""}:member));});},[account?.user.id]);
   useEffect(()=>{const handler=(event)=>{event.preventDefault();setInstallPrompt(event);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
