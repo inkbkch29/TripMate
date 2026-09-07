@@ -645,6 +645,7 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
   const [locationSharing,setLocationSharing]=useState(false);const [locationBusy,setLocationBusy]=useState(false);const [locationResumeSuggested,setLocationResumeSuggested]=useState(false);
   const locationWatchRef=useRef(null);const lastLocationSentRef=useRef(0);
   const [installPrompt,setInstallPrompt]=useState(null);
+  const [notificationPromptOpen,setNotificationPromptOpen]=useState(false);
   useEffect(() => { const timer = setTimeout(() => setLoading(false), 850); return () => clearTimeout(timer); }, []);
   useEffect(() => {
     if (!account?.profile) return;
@@ -662,6 +663,26 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
   useEffect(()=>{if(!account)return subscribeToProfiles((payload)=>{const profile=payload.new;if(!profile?.id)return;setMembers((old)=>old.map((member)=>member.id===profile.id?{...member,name:profile.display_name||member.name,avatar:profile.avatar_url||"",accountName:profile.account_name||""}:member));});},[account?.user.id]);
   useEffect(()=>{const handler=(event)=>{event.preventDefault();setInstallPrompt(event);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
   const showToast = (text, severity = "success") => setToast({ open: true, text, severity });
+  useEffect(()=>{
+    const standalone=window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
+    const dismissed=localStorage.getItem("tripmate-notification-prompt-dismissed")==="true";
+    if(standalone&&"Notification" in window&&Notification.permission==="default"&&!dismissed){
+      const timer=window.setTimeout(()=>setNotificationPromptOpen(true),900);
+      return()=>window.clearTimeout(timer);
+    }
+  },[]);
+  const closeNotificationPrompt=()=>{localStorage.setItem("tripmate-notification-prompt-dismissed","true");setNotificationPromptOpen(false);};
+  const requestNotificationPermission=async()=>{
+    try{
+      const permission=await Notification.requestPermission();
+      localStorage.setItem("tripmate-notification-prompt-dismissed","true");
+      setNotificationPromptOpen(false);
+      showToast(permission==="granted"?"เปิดการแจ้งเตือนแล้ว":"ยังไม่ได้อนุญาตการแจ้งเตือน",permission==="granted"?"success":"info");
+    }catch{
+      closeNotificationPrompt();
+      showToast("เปิดการแจ้งเตือนไม่สำเร็จ กรุณาตรวจในการตั้งค่า iPhone","warning");
+    }
+  };
   const currentUserId=account?.user.id||"u1";
   useEffect(()=>{if(!activeTrip?.id)return;const shouldResume=localStorage.getItem(`tripmate-location-intent:${activeTrip.id}`)==="true";setLocationResumeSuggested(shouldResume);if(shouldResume)setTab(2);},[activeTrip?.id]);
   const toggleLocationSharing=async()=>{if(!account||!activeTrip)return;const intentKey=`tripmate-location-intent:${activeTrip.id}`;const today=localDateString();if(today<activeTrip.start_date||today>activeTrip.end_date)return showToast("แชร์ตำแหน่งได้เฉพาะช่วงวันเดินทาง","warning");if(locationSharing){setLocationBusy(true);try{if(locationWatchRef.current!==null)navigator.geolocation.clearWatch(locationWatchRef.current);locationWatchRef.current=null;await stopLiveLocation(activeTrip.id,account.user.id);localStorage.removeItem(intentKey);setLocationResumeSuggested(false);setLocations((old)=>old.filter((item)=>item.user_id!==account.user.id));setLocationSharing(false);showToast("หยุดแชร์ตำแหน่งแล้ว","info");}catch(err){showToast(err.message,"error");}finally{setLocationBusy(false);}return;}if(!navigator.geolocation)return showToast("เบราว์เซอร์นี้ไม่รองรับตำแหน่ง","error");localStorage.setItem(intentKey,"true");setLocationResumeSuggested(false);setLocationBusy(true);locationWatchRef.current=navigator.geolocation.watchPosition(async({coords})=>{if(Date.now()-lastLocationSentRef.current<10000)return;lastLocationSentRef.current=Date.now();try{await saveLiveLocation(activeTrip.id,account.user.id,coords);const row={trip_id:activeTrip.id,user_id:account.user.id,latitude:coords.latitude,longitude:coords.longitude,accuracy_m:coords.accuracy,sharing_enabled:true,updated_at:new Date().toISOString()};setLocations((old)=>[...old.filter((item)=>item.user_id!==account.user.id),row]);setLocationHistory((old)=>[...old,{...row,recorded_at:row.updated_at}]);setLocationSharing(true);setLocationBusy(false);}catch(err){setLocationBusy(false);showToast(err.message,"error");}},(error)=>{localStorage.removeItem(intentKey);setLocationResumeSuggested(false);setLocationBusy(false);setLocationSharing(false);showToast(error.code===1?"กรุณาอนุญาตการเข้าถึงตำแหน่ง":"อ่านตำแหน่งไม่สำเร็จ","error");},{enableHighAccuracy:true,maximumAge:10000,timeout:15000});};
@@ -692,6 +713,17 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
     {activeTrip&&<TripHistoryDialog open={dialog==="history"} onClose={()=>setDialog("")} trip={activeTrip} members={members} stops={stops} expenses={expenses} collections={collections} onRestored={()=>window.location.reload()}/>}
     {activeTrip&&<TripSettingsDialog open={dialog==="settings"} onClose={()=>setDialog("")} trip={activeTrip} onVote={()=>setDialog("stay-vote")} onVoteResults={()=>setDialog("stay-results")} onHistory={()=>setDialog("history")} onSave={async(settings)=>{const updated=account?await saveTripSettings(activeTrip.id,settings):{...activeTrip,...settings};setActiveTrip({...activeTrip,...updated,trip_role:activeTrip.trip_role});if(onRefresh)await onRefresh();showToast("บันทึกการตั้งค่าทริปแล้ว");}}/>}
     <NotificationDialog open={dialog==="notifications"} onClose={()=>setDialog("")} items={notifications} onOpenItem={openNotification}/>
+    <Dialog open={notificationPromptOpen} onClose={closeNotificationPrompt} fullWidth maxWidth="xs" className="notification-permission-dialog">
+      <DialogContent>
+        <Stack spacing={2} alignItems="center" textAlign="center" pt={1}>
+          <Avatar className="notification-permission-icon"><NotificationsRounded/></Avatar>
+          <Box><Typography variant="h5" fontWeight={900}>ไม่พลาดอัปเดตจากทริป</Typography><Typography color="text.secondary" mt={.7}>รับแจ้งเตือนเมื่อมีคำขอเข้าร่วม แผนเปลี่ยน หรือรายการชำระเงินที่ต้องจัดการ</Typography></Box>
+          <Alert severity="info">คุณปิดการแจ้งเตือนได้ทุกเมื่อในการตั้งค่า iPhone</Alert>
+          <Button fullWidth variant="contained" startIcon={<NotificationsRounded/>} onClick={requestNotificationPermission}>อนุญาตการแจ้งเตือน</Button>
+          <Button fullWidth color="inherit" onClick={closeNotificationPrompt}>ไว้ทีหลัง</Button>
+        </Stack>
+      </DialogContent>
+    </Dialog>
     {account&&<TripManagerDialog open={dialog==="trips"} onClose={()=>setDialog("")} trips={trips} activeTripId={activeTrip?.id} onSelect={(item)=>{onTripChange?.(item.id);setDialog("");}} onCreate={()=>{setDialog("");onNewTrip?.();}} onEdit={(item)=>{setActiveTrip(item);onTripChange?.(item.id);setDialog("settings");}} onDelete={async(item)=>{await deleteTripStorage(item.id);await deleteTrip(item.id);await onRefresh?.();setDialog("");showToast("ลบทริปแล้ว","info");}}/>}
     <PaymentQrDialog member={selectedQr} onClose={()=>setSelectedQr(null)}/>
     <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast({ ...toast, open: false })} anchorOrigin={{ vertical: "top", horizontal: "center" }}><Alert severity={toast.severity} variant="filled" onClose={() => setToast({ ...toast, open: false })}>{toast.text}</Alert></Snackbar>
