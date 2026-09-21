@@ -829,4 +829,22 @@ function ConnectedApp() {
 const appRoot = window.__tripMateRoot || (window.__tripMateRoot = createRoot(document.getElementById("root")));
 const queryParams=new URLSearchParams(window.location.search);const previewDemo=queryParams.get("demo")==="1";const guestToken=queryParams.get("guest");const voteToken=queryParams.get("vote");
 appRoot.render(<React.StrictMode><AppErrorBoundary>{isSupabaseConfigured&&voteToken?<UserAwareStayVoteBootstrap token={voteToken}/>:isSupabaseConfigured&&guestToken?<GuestBootstrap token={guestToken}/>:isSupabaseConfigured && !previewDemo ? <ConnectedApp/> : <App/>}</AppErrorBoundary></React.StrictMode>);
-if("serviceWorker" in navigator&&import.meta.env.PROD)window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+if("serviceWorker" in navigator&&import.meta.env.PROD){
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(refreshing)return;
+    refreshing=true;
+    window.location.reload();
+  });
+  window.addEventListener("load",async()=>{
+    try{
+      const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"});
+      const checkForUpdate=()=>registration.update().catch(()=>{});
+      checkForUpdate();
+      document.addEventListener("visibilitychange",()=>{
+        if(document.visibilityState==="visible")checkForUpdate();
+      });
+      window.addEventListener("pageshow",checkForUpdate);
+    }catch{}
+  });
+}

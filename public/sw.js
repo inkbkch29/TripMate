@@ -1,4 +1,8 @@
-const CACHE="tripmate-v4";
+// Replaced with a unique value by Vite on every production build. This makes
+// installed iOS/Android PWAs detect a deployment even when this source file
+// itself did not otherwise change.
+const BUILD_ID="__TRIPMATE_BUILD_ID__";
+const CACHE=`tripmate-${BUILD_ID}`;
 const APP_SHELL=["/","/manifest.webmanifest","/app-icon-192.png","/app-icon-512.png","/apple-touch-icon.png"];
 
 self.addEventListener("install",(event)=>{
