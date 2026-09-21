@@ -192,6 +192,17 @@ export async function savePushSubscription(subscription){
   if(error)throw error;
 }
 
+export async function loadNotifications(limit=100){const {data,error}=await supabase.from("user_notifications").select("*").order("created_at",{ascending:false}).limit(limit);if(error)throw error;return data||[];}
+export async function markNotificationRead(id){const {error}=await supabase.from("user_notifications").update({read_at:new Date().toISOString()}).eq("id",id);if(error)throw error;}
+export async function markAllNotificationsRead(){const {error}=await supabase.from("user_notifications").update({read_at:new Date().toISOString()}).is("read_at",null);if(error)throw error;}
+export async function loadNotificationPreferences(){const {data,error}=await supabase.from("notification_preferences").select("type,enabled");if(error)throw error;return Object.fromEntries((data||[]).map(row=>[row.type,row.enabled]));}
+export async function saveNotificationPreference(userId,type,enabled){const {error}=await supabase.from("notification_preferences").upsert({user_id:userId,type,enabled,updated_at:new Date().toISOString()});if(error)throw error;}
+export function subscribeToNotifications(userId,onChange){const channel=supabase.channel(`notifications-${userId}-${crypto.randomUUID()}`).on("postgres_changes",{event:"*",schema:"public",table:"user_notifications",filter:`recipient_id=eq.${userId}`},onChange).subscribe();return()=>supabase.removeChannel(channel);}
+
+export async function loadLocationConsent(tripId,userId){const {data,error}=await supabase.from("location_consents").select("*").eq("trip_id",tripId).eq("user_id",userId).maybeSingle();if(error)throw error;return data;}
+export async function saveLocationConsent(tripId,userId,autoStopAt){const {data,error}=await supabase.from("location_consents").upsert({trip_id:tripId,user_id:userId,policy_version:"2026-09-21",consented_at:new Date().toISOString(),revoked_at:null,auto_stop_at:autoStopAt||null}).select().single();if(error)throw error;return data;}
+export async function revokeLocationConsent(tripId,userId){const {error}=await supabase.from("location_consents").update({revoked_at:new Date().toISOString(),auto_stop_at:null}).eq("trip_id",tripId).eq("user_id",userId);if(error)throw error;}
+
 export async function sendLocationPush(tripId,eventType,distance=0){
   const {error}=await supabase.functions.invoke("send-location-push",{body:{tripId,eventType,distanceMeters:distance}});
   if(error)throw error;

@@ -31,14 +31,17 @@ Deno.serve(async(req)=>{
     const since=new Date(Date.now()-throttleMinutes*60*1000).toISOString();
     const {data:recent}=await admin.from("push_notification_events").select("id").eq("trip_id",tripId).eq("actor_id",user.id).eq("event_type",eventType).gte("created_at",since).limit(1);
     if(recent?.length)return Response.json({sent:0,throttled:true},{headers:corsHeaders});
-    await admin.from("push_notification_events").insert({trip_id:tripId,actor_id:user.id,event_type:eventType});
+    const {data:eventRow}=await admin.from("push_notification_events").insert({trip_id:tripId,actor_id:user.id,event_type:eventType}).select("id").single();
 
     const [{data:profile},{data:trip},{data:members}]=await Promise.all([
       admin.from("profiles").select("display_name").eq("id",user.id).maybeSingle(),
       admin.from("trips").select("name").eq("id",tripId).maybeSingle(),
       admin.from("trip_members").select("user_id").eq("trip_id",tripId).neq("user_id",user.id),
     ]);
-    const recipientIds=(members||[]).map((item)=>item.user_id);
+    const memberIds=(members||[]).map((item)=>item.user_id);
+    const {data:disabledPreferences}=memberIds.length?await admin.from("notification_preferences").select("user_id").in("user_id",memberIds).eq("type","location").eq("enabled",false):{data:[]};
+    const disabledIds=new Set((disabledPreferences||[]).map((item)=>item.user_id));
+    const recipientIds=memberIds.filter((id)=>!disabledIds.has(id));
     if(!recipientIds.length)return Response.json({sent:0},{headers:corsHeaders});
     const {data:subscriptions}=await admin.from("push_subscriptions").select("id,endpoint,p256dh,auth").in("user_id",recipientIds);
     const name=profile?.display_name||"เพื่อน";
@@ -46,6 +49,7 @@ Deno.serve(async(req)=>{
     const body=eventType==="online"
       ?`${name} เปิด TripMate และเริ่มแชร์ตำแหน่งแล้ว`
       :`${name} กำลังเคลื่อนที่${distance>=1000?` · ${(distance/1000).toFixed(1)} กม.`:distance>=100?` · ${Math.round(distance)} ม.`:""}`;
+    await admin.from("user_notifications").insert(recipientIds.map((recipientId)=>({recipient_id:recipientId,trip_id:tripId,type:"location",title:trip?.name||"TripMate",body,target:{tab:2,userId:user.id},dedupe_key:`location:${eventRow?.id||crypto.randomUUID()}`})));
     const payload=JSON.stringify({title:trip?.name||"TripMate",body,url:"/",tag:`trip-location-${user.id}`});
     webpush.setVapidDetails("https://trip-mate-eta-weld.vercel.app",publicKey,privateKey);
 
