@@ -17,7 +17,7 @@ npm run dev
 
 1. สร้างโปรเจกต์ที่ [Supabase](https://supabase.com/dashboard)
 2. โปรเจกต์ใหม่: รัน `supabase/schema.sql` แล้วรันไฟล์ใน `supabase/migrations/` ตามชื่อไฟล์จากเก่าไปใหม่
-3. โปรเจกต์ TripMate เดิม: รันเฉพาะ migration ที่ยังไม่เคยรัน โดยไฟล์ล่าสุดคือ `20260820_2345_shared_invite_approval.sql`
+3. โปรเจกต์ TripMate เดิม: ใช้ Supabase CLI ตรวจ migration history และรันเฉพาะ migration ที่ยังไม่เคยรัน ห้าม repair migration เก่าโดยไม่ตรวจฐานข้อมูลจริง
 4. ไปที่ **Authentication → URL Configuration** แล้วตั้ง Site URL เป็น URL ของ Vercel (ตอนพัฒนาใช้ URL ที่ Vite แสดง เช่น `http://localhost:5173`)
 5. คัดลอก `.env.example` เป็น `.env.local` แล้วใส่ Project URL และ public anon key:
 
@@ -64,4 +64,8 @@ npm run preview
 
 ตำแหน่งละเอียดจะถูกลบเมื่อเก่ากว่า 24 ชั่วโมงและหยุดแชร์อัตโนมัติหลังจบทริป ระบบเก็บไว้เฉพาะยอดระยะทางสะสมสำหรับ Trip Recap โดยไม่เก็บพิกัดเก่าไว้ถาวร
 
-การแจ้งเตือนบนเครื่องทำงานเมื่อผู้ใช้ติดตั้ง/เปิดเว็บไว้และอนุญาต Notification ส่วน push แบบปิดแอปเต็มรูปแบบต้องเพิ่ม Web Push provider หรือ Supabase Edge Function พร้อม VAPID keys ภายหลัง
+Web Push ทำงานผ่าน Service Worker และ Supabase Edge Function หลังผู้ใช้ติดตั้ง PWA และอนุญาต Notification การแจ้งเตือนถูกเก็บใน Notification Center และปิดแยกตามประเภทได้
+
+## Backup และ retention
+
+ดูขั้นตอนสำรองข้อมูล ทดสอบ restore และนโยบายเก็บไฟล์ที่ [docs/BACKUP_RECOVERY.md](docs/BACKUP_RECOVERY.md)

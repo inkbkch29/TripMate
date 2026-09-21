@@ -126,7 +126,7 @@ async function signedTripFile(path) {
 }
 
 export async function loadTripData(tripId) {
-  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult] = await withTimeout(Promise.all([
+  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult, checklistResult] = await withTimeout(Promise.all([
     supabase.from("trip_members").select("trip_role, profiles(*)").eq("trip_id", tripId),
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
@@ -136,6 +136,7 @@ export async function loadTripData(tripId) {
     supabase.from("trip_stop_checkins").select("*, trip_stops!inner(trip_id)").eq("trip_stops.trip_id",tripId),
     supabase.from("trip_location_history").select("user_id,latitude,longitude,recorded_at").eq("trip_id",tripId).order("recorded_at"),
     supabase.from("trip_route_stats").select("user_id,distance_m").eq("trip_id",tripId),
+    supabase.from("trip_checklist_items").select("*").eq("trip_id",tripId).order("created_at"),
   ]),12000,"โหลดข้อมูลทริปช้าเกินไป กรุณาลองใหม่");
   const failed = [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult].find((result) => result.error);
   if (failed) throw failed.error;
@@ -169,8 +170,14 @@ export async function loadTripData(tripId) {
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
     locationHistory: historyResult.error ? [] : (historyResult.data || []),
     routeDistance: routeStatsResult.error ? 0 : (routeStatsResult.data || []).reduce((sum,item)=>sum+Number(item.distance_m||0),0),
+    checklist: checklistResult.error ? [] : (checklistResult.data||[]).map(item=>({id:item.id,title:item.title,assignedTo:item.assigned_to,done:item.is_done,visibility:item.visibility||"shared",createdBy:item.created_by})),
   };
 }
+
+export async function createChecklistItem(tripId,userId,title,visibility="shared"){const {data,error}=await supabase.from("trip_checklist_items").insert({trip_id:tripId,created_by:userId,title,visibility,assigned_to:visibility==="personal"?userId:null}).select().single();if(error)throw error;return {id:data.id,title:data.title,assignedTo:data.assigned_to,done:data.is_done,visibility:data.visibility,createdBy:data.created_by};}
+export async function toggleChecklistItem(id,done){const {error}=await supabase.rpc("toggle_trip_checklist",{target_item:id,target_done:done});if(error)throw error;}
+export async function deleteChecklistItem(id){const {error}=await supabase.from("trip_checklist_items").delete().eq("id",id);if(error)throw error;}
+export async function trackEvent(eventName,tripId=null,surface=null){const {data:{user}}=await supabase.auth.getUser();if(!user)return;await supabase.from("product_analytics").insert({user_id:user.id,trip_id:tripId,event_name:eventName,surface});}
 
 export async function saveLiveLocation(tripId,userId,coords) {
   const {error}=await supabase.from("live_locations").upsert({trip_id:tripId,user_id:userId,latitude:coords.latitude,longitude:coords.longitude,accuracy_m:coords.accuracy,sharing_enabled:true,updated_at:new Date().toISOString()});
@@ -225,6 +232,7 @@ export function subscribeToTripActivity(tripId,onChange) {
     .on("postgres_changes",{event:"*",schema:"public",table:"expenses",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("expense",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"collections",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("collection",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_stop_checkins"},(payload)=>onChange("checkin",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_checklist_items",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("checklist",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"collection_payments"},(payload)=>onChange("payment",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_members",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("member",payload))
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"trip_activity_log",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("activity",payload))
@@ -308,6 +316,9 @@ export async function uploadTripFile(tripId, userId, kind, file) {
   const { error } = await supabase.storage.from("trip-files").upload(path, uploadFile, { upsert: false,contentType:uploadFile.type });
   if (error) throw error;
   const { data } = await supabase.storage.from("trip-files").createSignedUrl(path, 3600);
+  const {data:trip}=await supabase.from("trips").select("end_date").eq("id",tripId).maybeSingle();
+  const retentionBase=trip?.end_date?new Date(`${trip.end_date}T23:59:59`):new Date();retentionBase.setDate(retentionBase.getDate()+90);
+  await supabase.from("trip_file_retention").upsert({path,trip_id:tripId,kind,created_by:userId,retain_until:retentionBase.toISOString()});
   return { path, signedUrl: data?.signedUrl || "" };
 }
 
@@ -315,6 +326,7 @@ export async function deleteTripFile(path) {
   if (!path) return;
   const { error }=await supabase.storage.from("trip-files").remove([path]);
   if (error) throw error;
+  await supabase.from("trip_file_retention").delete().eq("path",path);
 }
 
 export async function deleteExpense(tripId,expenseId) {
