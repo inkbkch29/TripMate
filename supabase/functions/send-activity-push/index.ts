@@ -26,8 +26,9 @@ Deno.serve(async(req)=>{
     if(activityError||!activity)throw new Error("Activity not found");
     if(activity.actor_id!==user.id)throw new Error("Only the activity owner can send this push");
     const dedupeKey=`activity:${activity.id}`;
-    const {data:notifications,error:notificationError}=await admin.from("user_notifications").select("id,recipient_id,title,body,target").eq("dedupe_key",dedupeKey).is("pushed_at",null);
+    const {data:notificationRows,error:notificationError}=await admin.from("user_notifications").select("id,recipient_id,title,body,target").eq("dedupe_key",dedupeKey);
     if(notificationError)throw notificationError;
+    const notifications=(notificationRows||[]).filter(item=>!item.target?.pushedAt);
     if(!notifications?.length)return Response.json({sent:0,deduped:true},{headers:corsHeaders});
     const recipientIds=[...new Set(notifications.map(item=>item.recipient_id))];
     const {data:subscriptions}=await admin.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id",recipientIds);
@@ -47,7 +48,8 @@ Deno.serve(async(req)=>{
         else console.error("Push delivery failed",status,error?.message);
       }
     }
-    await admin.from("user_notifications").update({pushed_at:new Date().toISOString()}).in("id",notifications.map(item=>item.id));
+    const pushedAt=new Date().toISOString();
+    await Promise.all(notifications.map(item=>admin.from("user_notifications").update({target:{...(item.target||{}),pushedAt}}).eq("id",item.id)));
     return Response.json({sent},{headers:corsHeaders});
   }catch(error:any){
     const status=error.message==="Unauthorized"?401:error.message.includes("activity owner")?403:400;
