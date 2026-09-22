@@ -769,11 +769,14 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
         addLocationAlert(`${name} กำลังเคลื่อนที่ · ขยับจากจุดล่าสุด ${moved>=1000?`${(moved/1000).toFixed(1)} กม.`:`${Math.round(moved)} ม.`}`);
       }
     });
-    const timer=window.setInterval(refresh,5000);
-    const onVisible=()=>{if(document.visibilityState==="visible")refresh();};
+    let fallbackTimer=null;
+    const stopFallback=()=>{if(fallbackTimer!==null){window.clearTimeout(fallbackTimer);fallbackTimer=null;}};
+    const scheduleFallback=()=>{stopFallback();if(!mounted||document.visibilityState!=="visible")return;fallbackTimer=window.setTimeout(async()=>{try{await refresh();}finally{scheduleFallback();}},45000);};
+    const onVisible=()=>{if(document.visibilityState==="visible"){refresh();scheduleFallback();}else stopFallback();};
     document.addEventListener("visibilitychange",onVisible);
     refresh();
-    return()=>{mounted=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible);unsubscribe();};
+    scheduleFallback();
+    return()=>{mounted=false;stopFallback();document.removeEventListener("visibilitychange",onVisible);unsubscribe();};
   },[activeTrip?.id,account?.user.id,members.length]);
   useEffect(()=>{if(!activeTrip||!account)return;let refreshTimer;const unsubscribe=subscribeToTripActivity(activeTrip.id,(type,payload)=>{if(type==="plan"&&payload.new?.created_by!==account.user.id)setLiveAlerts((old)=>[{type:"plan",text:"แผนการเดินทางถูกแก้ไขแล้ว",at:Date.now()},...old].slice(0,8));window.clearTimeout(refreshTimer);refreshTimer=window.setTimeout(()=>loadTripData(activeTrip.id).then((data)=>{setMembers(data.members);setStops(data.stops);setExpenses(data.expenses);setCollections(data.collections);setCheckins(data.checkins||[]);setLocationHistory(data.locationHistory||[]);setRouteDistanceTotal(data.routeDistance||0);setChecklist(data.checklist||[]);}).catch(()=>{}),450);});return()=>{window.clearTimeout(refreshTimer);unsubscribe();};},[activeTrip?.id,account?.user.id]);
   useEffect(()=>{if(!account)return subscribeToProfiles((payload)=>{const profile=payload.new;if(!profile?.id)return;setMembers((old)=>old.map((member)=>member.id===profile.id?{...member,name:profile.display_name||member.name,avatar:profile.avatar_url||"",accountName:profile.account_name||""}:member));});},[account?.user.id]);
