@@ -215,6 +215,11 @@ export async function sendLocationPush(tripId,eventType,distance=0){
   if(error)throw error;
 }
 
+export async function sendActivityPush(activityId){
+  const {error}=await supabase.functions.invoke("send-activity-push",{body:{activityId}});
+  if(error)throw error;
+}
+
 export async function stopLiveLocation(tripId,userId) {
   const {error}=await supabase.from("live_locations").update({sharing_enabled:false,updated_at:new Date().toISOString()}).eq("trip_id",tripId).eq("user_id",userId);
   if(error) throw error;

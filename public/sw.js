@@ -32,7 +32,7 @@ self.addEventListener("fetch",(event)=>{
     return response;
   })));
 });
-self.addEventListener("message",(event)=>{if(event.data?.type!=="SHOW_NOTIFICATION")return;const {title="TripMate",body="มีรายการใหม่ที่ต้องตรวจสอบ"}=event.data;event.waitUntil(self.registration.showNotification(title,{body,icon:"/app-icon-192.png",badge:"/app-icon-192.png",tag:"tripmate-update",data:{url:"/"}}));});
+self.addEventListener("message",(event)=>{if(event.data?.type!=="SHOW_NOTIFICATION")return;const {title="TripMate",body="มีรายการใหม่ที่ต้องตรวจสอบ",tag="tripmate-update",url="/"}=event.data;event.waitUntil(self.registration.showNotification(title,{body,icon:"/app-icon-192.png",badge:"/app-icon-192.png",tag,data:{url}}));});
 self.addEventListener("push",(event)=>{
   let payload={title:"TripMate",body:"มีอัปเดตใหม่จากทริป",url:"/",tag:"tripmate-push"};
   try{if(event.data)payload={...payload,...event.data.json()};}catch{if(event.data)payload.body=event.data.text();}
