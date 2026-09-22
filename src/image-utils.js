@@ -20,6 +20,19 @@ function canvasToBlob(canvas, type, quality) {
   });
 }
 
+export function drawSquareCrop(context,image,size,{rotation=0,zoom=1,offsetX=0,offsetY=0}={}){
+  const width=image.naturalWidth||image.width;const height=image.naturalHeight||image.height;
+  const quarterTurn=Math.abs(rotation/90)%2===1;const rotatedWidth=quarterTurn?height:width;const rotatedHeight=quarterTurn?width:height;
+  const scale=Math.max(size/rotatedWidth,size/rotatedHeight)*zoom;
+  const maxX=Math.max(0,(rotatedWidth*scale-size)/2);const maxY=Math.max(0,(rotatedHeight*scale-size)/2);
+  context.save();context.clearRect(0,0,size,size);context.fillStyle="#eef6fb";context.fillRect(0,0,size,size);context.translate(size/2+(offsetX/100)*maxX,size/2+(offsetY/100)*maxY);context.rotate(rotation*Math.PI/180);context.imageSmoothingEnabled=true;context.imageSmoothingQuality="high";context.drawImage(image,-width*scale/2,-height*scale/2,width*scale,height*scale);context.restore();
+}
+
+export async function cropProfileImage(file,options={}){
+  const {image,url}=await loadImage(file);
+  try{const canvas=document.createElement("canvas");canvas.width=PROFILE_IMAGE_SIZE;canvas.height=PROFILE_IMAGE_SIZE;const context=canvas.getContext("2d",{alpha:false});if(!context)throw new Error("อุปกรณ์นี้ไม่รองรับการครอปรูป");drawSquareCrop(context,image,PROFILE_IMAGE_SIZE,options);let blob;try{blob=await canvasToBlob(canvas,"image/webp",PROFILE_IMAGE_QUALITY);}catch{blob=await canvasToBlob(canvas,"image/jpeg",.86);}const extension=blob.type==="image/webp"?"webp":"jpg";return new File([blob],`avatar-${Date.now()}.${extension}`,{type:blob.type,lastModified:Date.now()});}finally{URL.revokeObjectURL(url);}
+}
+
 export async function compressImage(file, { maxWidth = 1600, maxHeight = 1600, quality = 0.84, square = false } = {}) {
   const { image, url } = await loadImage(file);
   try {

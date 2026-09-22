@@ -8,7 +8,7 @@ import {
   Alert, AppBar, Avatar, AvatarGroup, Badge, BottomNavigation, BottomNavigationAction, Box, Button,
   Card, CardContent, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, FormControlLabel, IconButton, LinearProgress, MenuItem, Skeleton,
-  Snackbar, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Toolbar, Typography,
+  Slider, Snackbar, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Toolbar, Typography,
 } from "@mui/material";
 import {
   AddRounded, ArrowForwardRounded, CalendarMonthRounded, CameraAltRounded, CheckCircleRounded,
@@ -19,10 +19,10 @@ import {
   KeyboardArrowUpRounded, KeyboardArrowDownRounded, DoneAllRounded, InstallMobileRounded,
   ExploreRounded, GroupRounded, AccessTimeRounded, DeleteOutlineRounded, AddCircleOutlineRounded,
   DownloadRounded, VisibilityRounded,
-  HistoryRounded, RestoreRounded, FileDownloadRounded, WifiOffRounded, HowToVoteRounded, SyncRounded, CloudDoneRounded,
+  HistoryRounded, RestoreRounded, FileDownloadRounded, WifiOffRounded, HowToVoteRounded, SyncRounded, CloudDoneRounded, RotateLeftRounded, RotateRightRounded, ZoomInRounded,
 } from "@mui/icons-material";
 import { calculateBalances, simplifyDebts, splitAmount } from "./finance";
-import { compressProfileImage } from "./image-utils";
+import { cropProfileImage, drawSquareCrop } from "./image-utils";
 import { castStayVote, claimInvite, cleanupTripLocations, confirmCollectionPayment, createChecklistItem, createInvite, createStayPoll, deleteChecklistItem, deleteCollection, deleteExpense, deleteStop, deleteTrip, deleteTripFile, deleteTripStorage, getInviteStatus, getMyTripContext, isSupabaseConfigured, listStayPolls, listTripVoteLinks, loadGuestTrip, loadLiveLocations, loadLocationConsent, loadNotificationPreferences, loadNotifications, loadStayPoll, loadTripActivity, loadTripData, loadTripInvites, loadTripJoinRequests, loadTripTrash, markAllNotificationsRead, markNotificationRead, removeTripMember, reorderTripStops, restoreTripItem, reviewExpense, reviewSettlement, reviewTripJoinRequest, revokeLocationConsent, revokeTripInvite, saveCollection, saveExpense, saveLiveLocation, saveLocationConsent, saveNotificationPreference, savePushSubscription, sendLocationPush, saveStop, saveTripSettings, selectStayPollWinner, setStopCheckin, stopLiveLocation, submitCollectionPayment, submitSettlement, subscribeToJoinRequests, subscribeToLocations, subscribeToNotifications, subscribeToProfiles, subscribeToTripActivity, supabase, toggleChecklistItem, toggleTripStopDone, trackEvent, resetStayPollVotes, updateStayPoll, updateTripMemberRole, uploadTripCover, uploadTripFile } from "./supabase";
 import { chooseTrip, distanceMeters, groupNearbyLocations } from "./trip-utils";
 import { isConnectionError, queueLabels } from "./offline-queue";
@@ -397,21 +397,25 @@ function Money({ members, expenses, setExpenses, collections, setCollections, se
   </Stack>;
 }
 
+function ProfileImageCropDialog({file,onClose,onApply}){
+  const canvasRef=useRef(null);const imageRef=useRef(null);const [rotation,setRotation]=useState(0);const [zoom,setZoom]=useState(1);const [offsetX,setOffsetX]=useState(0);const [offsetY,setOffsetY]=useState(0);const [busy,setBusy]=useState(false);const [ready,setReady]=useState(false);
+  useEffect(()=>{if(!file)return;setRotation(0);setZoom(1);setOffsetX(0);setOffsetY(0);setReady(false);const url=URL.createObjectURL(file);const image=new Image();image.onload=()=>{imageRef.current=image;setReady(true);};image.onerror=()=>onClose();image.src=url;return()=>{URL.revokeObjectURL(url);imageRef.current=null;};},[file]);
+  useEffect(()=>{const canvas=canvasRef.current,image=imageRef.current;if(!canvas||!image||!ready)return;const context=canvas.getContext("2d",{alpha:false});if(context)drawSquareCrop(context,image,canvas.width,{rotation,zoom,offsetX,offsetY});},[ready,rotation,zoom,offsetX,offsetY]);
+  const apply=async()=>{setBusy(true);try{const cropped=await cropProfileImage(file,{rotation,zoom,offsetX,offsetY});await onApply(cropped);}finally{setBusy(false);}};
+  return <Dialog open={Boolean(file)} onClose={()=>!busy&&onClose()} fullWidth maxWidth="xs" className="profile-crop-dialog"><SheetTitle onClose={busy?null:onClose}>ปรับรูปโปรไฟล์</SheetTitle><DialogContent><Stack spacing={1.5}><Box className="profile-crop-stage"><canvas ref={canvasRef} width="600" height="600" aria-label="ตัวอย่างรูปหลังครอป"/><span aria-hidden="true"/></Box><Stack direction="row" justifyContent="center" spacing={1}><IconButton aria-label="หมุนซ้าย" onClick={()=>setRotation(value=>(value-90)%360)}><RotateLeftRounded/></IconButton><Chip label={`${((rotation%360)+360)%360}°`}/><IconButton aria-label="หมุนขวา" onClick={()=>setRotation(value=>(value+90)%360)}><RotateRightRounded/></IconButton></Stack><Box><Typography variant="caption"><ZoomInRounded fontSize="inherit"/> ซูม</Typography><Slider min={1} max={3} step={.05} value={zoom} onChange={(_,value)=>setZoom(value)} aria-label="ซูมรูป"/></Box><Box><Typography variant="caption">เลื่อนซ้าย–ขวา</Typography><Slider min={-100} max={100} value={offsetX} onChange={(_,value)=>setOffsetX(value)} aria-label="ตำแหน่งแนวนอน"/></Box><Box><Typography variant="caption">เลื่อนขึ้น–ลง</Typography><Slider min={-100} max={100} value={offsetY} onChange={(_,value)=>setOffsetY(value)} aria-label="ตำแหน่งแนวตั้ง"/></Box><Typography variant="caption" color="text.secondary" textAlign="center">พื้นที่ในวงกลมคือส่วนที่จะแสดงเป็นรูปโปรไฟล์</Typography></Stack></DialogContent><DialogActions><Button disabled={busy} onClick={onClose}>เลือกใหม่</Button><BusyButton busy={busy} disabled={!ready} variant="contained" onClick={apply}>ใช้รูปนี้</BusyButton></DialogActions></Dialog>;
+}
+
 function Profile({ members, setMembers, onAddMember, toast, account, activeTrip, onLogout, canInvite = true, onSettings, onRoleChange, onRemoveMember, canInstall, onInstall, voteLinks }) {
-  const meIndex = account ? members.findIndex((m) => m.id === account.user.id) : 0; const me = members[Math.max(0,meIndex)] || membersSeed[0]; const [busy, setBusy] = useState(false); const [showPaymentQr,setShowPaymentQr]=useState(false);
-  const upload = async (event) => {
-    const input = event.target; const file = input.files?.[0];
-    if (!file) return;
-    if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { input.value=""; return toast("รองรับเฉพาะ JPG, PNG หรือ WebP", "error"); }
-    if (file.size > 15 * 1024 * 1024) { input.value=""; return toast("ไฟล์ต้นฉบับต้องมีขนาดไม่เกิน 15 MB", "error"); }
+  const meIndex = account ? members.findIndex((m) => m.id === account.user.id) : 0; const me = members[Math.max(0,meIndex)] || membersSeed[0]; const [busy, setBusy] = useState(false); const [showPaymentQr,setShowPaymentQr]=useState(false);const [cropFile,setCropFile]=useState(null);
+  const selectPhoto=(event)=>{const input=event.target,file=input.files?.[0];input.value="";if(!file)return;if(!["image/jpeg","image/png","image/webp"].includes(file.type))return toast("รองรับเฉพาะ JPG, PNG หรือ WebP","error");if(file.size>15*1024*1024)return toast("ไฟล์ต้นฉบับต้องมีขนาดไม่เกิน 15 MB","error");setCropFile(file);};
+  const upload = async (compressedFile) => {
     setBusy(true);
     try {
-      const compressedFile = await compressProfileImage(file);
       if (!account) {
         const reader = new FileReader();
         reader.onload = () => setMembers((old) => old.map((m, i) => i === meIndex ? { ...m, avatar: reader.result } : m));
         reader.readAsDataURL(compressedFile);
-        return;
+        return true;
       }
       const extension = compressedFile.type.split("/")[1].replace("jpeg","jpg");
       const path = `${account.user.id}/avatar-${Date.now()}.${extension}`;
@@ -423,20 +427,21 @@ function Profile({ members, setMembers, onAddMember, toast, account, activeTrip,
       if (updateError) throw updateError;
       setMembers((old)=>old.map((m)=>m.id===account.user.id?{...m,avatar:updatedProfile.avatar_url}:m));
       toast("เปลี่ยนรูปโปรไฟล์แล้ว");
-    } catch (error) { toast(error.message||"เปลี่ยนรูปโปรไฟล์ไม่สำเร็จ","error"); }
-    finally { setBusy(false); input.value=""; }
+      return true;
+    } catch (error) { toast(error.message||"เปลี่ยนรูปโปรไฟล์ไม่สำเร็จ","error");return false; }
+    finally { setBusy(false); }
   };
   const uploadPaymentQr = async (event) => { const file=event.target.files?.[0];const tripId=activeTrip?.id||account?.trips?.[0]?.id; if(!file||!account||!tripId)return;if(!["image/jpeg","image/png","image/webp"].includes(file.type)){event.target.value="";return toast("QR ต้องเป็นไฟล์ JPG, PNG หรือ WebP","error");} if(file.size>3*1024*1024){event.target.value="";return toast("รูป QR ต้องมีขนาดไม่เกิน 3 MB","error");} setBusy(true); try{const uploaded=await uploadTripFile(tripId,account.user.id,"payment-qr",file);const {error:updateError}=await supabase.from("profiles").update({payment_qr_path:uploaded.path}).eq("id",account.user.id);if(updateError)throw updateError;setMembers((old)=>old.map((m)=>m.id===account.user.id?{...m,paymentQr:uploaded.signedUrl,paymentQrPath:uploaded.path}:m));toast("บันทึก QR รับเงินแล้ว");}catch(err){toast(err.message,"error");}finally{setBusy(false);event.target.value="";} };
   const save = async () => { const displayName=me.name?.trim();if(!displayName)return toast("กรุณากรอกชื่อที่แสดง","error");setBusy(true);try{if (account) { const { error } = await supabase.from("profiles").update({display_name:displayName,account_name:me.accountName?.trim()||null}).eq("id",account.user.id); if (error) throw error;} else await wait();setMembers((old)=>old.map((member,index)=>index===meIndex?{...member,name:displayName,accountName:member.accountName?.trim()||""}:member));toast("บันทึกโปรไฟล์แล้ว");}catch(error){toast(error.message||"บันทึกโปรไฟล์ไม่สำเร็จ","error");}finally{setBusy(false);} };
   return <Stack spacing={2} className="profile-page">
-    <Box className="profile-identity" textAlign="center"><Box className="profile-avatar"><Avatar src={me.avatar} sx={{bgcolor:memberColor(me)}}>{memberInitial(me)}</Avatar></Box><Button className="profile-photo-button" component="label" size="small" variant="text" startIcon={busy?<CircularProgress size={16}/>:<CameraAltRounded/>} disabled={busy}>เปลี่ยนรูป<input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={upload}/></Button><Typography variant="h4" mt={.8}>{me.name}</Typography><Typography color="text.secondary">{me.role}</Typography></Box>
+    <Box className="profile-identity" textAlign="center"><Box className="profile-avatar"><Avatar src={me.avatar} sx={{bgcolor:memberColor(me)}}>{memberInitial(me)}</Avatar></Box><Button className="profile-photo-button" component="label" size="small" variant="text" startIcon={busy?<CircularProgress size={16}/>:<CameraAltRounded/>} disabled={busy}>เปลี่ยนรูป<input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={selectPhoto}/></Button><Typography variant="h4" mt={.8}>{me.name}</Typography><Typography color="text.secondary">{me.role}</Typography></Box>
     <section className="profile-section"><Typography variant="overline">เกี่ยวกับฉัน</Typography><Stack spacing={1.5} mt={1}><TextField required label="ชื่อที่แสดง" value={me.name} onChange={(e) => setMembers((old) => old.map((m, i) => i === meIndex ? { ...m, name: e.target.value } : m))}/><BusyButton busy={busy} variant="contained" onClick={save}>บันทึกชื่อ</BusyButton></Stack></section>
     <section className="profile-section payment-section"><Typography variant="overline">รับเงิน</Typography><Stack direction="row" alignItems="center" spacing={1.2} mt={1}><Box className="profile-list-icon"><QrCode2Rounded/></Box><Box flex={1}><Typography fontWeight={800}>{me.accountName||"ยังไม่ได้ใส่ชื่อบัญชี"}</Typography><Typography variant="caption" color="text.secondary">{me.paymentQr?"พร้อมรับเงินด้วย QR":"เพิ่ม QR เพื่อให้เพื่อนจ่ายง่ายขึ้น"}</Typography></Box>{me.paymentQr&&<Button size="small" onClick={()=>setShowPaymentQr(!showPaymentQr)}>{showPaymentQr?"ซ่อน QR":"ดู QR"}</Button>}</Stack>{showPaymentQr&&me.paymentQr&&<Box className="qr-preview compact"><img src={me.paymentQr} alt="QR รับเงินของฉัน"/></Box>}<Stack spacing={1.2} mt={1.5}><TextField label="ชื่อบัญชีรับเงิน" placeholder="เช่น นางสาวมินท์ ใจดี" value={me.accountName||""} onChange={(e)=>setMembers((old)=>old.map((m,i)=>i===meIndex?{...m,accountName:e.target.value}:m))}/><Button component="label" variant="outlined" startIcon={<QrCode2Rounded/>}>{me.paymentQr ? "เปลี่ยน QR รับเงิน" : "อัปโหลด QR รับเงิน"}<input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadPaymentQr}/></Button><BusyButton busy={busy} variant="contained" onClick={save}>บันทึกข้อมูลรับเงิน</BusyButton></Stack></section>
     <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">สมาชิกทั้งหมด</Typography>{canInvite && <Button startIcon={<PersonAddRounded/>} onClick={onAddMember}>เชิญเพื่อน</Button>}</Stack>
     <Card><CardContent>{members.map((m, index) => <React.Fragment key={m.id}><Stack direction="row" alignItems="center" py={1}><Avatar src={m.avatar} sx={{bgcolor:memberColor(m),mr:1.5}}>{memberInitial(m)}</Avatar><Box flex={1}><Typography fontWeight={750}>{m.name}</Typography><Typography variant="caption" color="text.secondary">{m.role}</Typography></Box>{canInvite&&m.tripRole!=="owner"&&m.id!==account?.user.id?<Stack direction="row" alignItems="center"><TextField select size="small" sx={{width:125}} value={m.tripRole||"member"} onChange={(event)=>onRoleChange?.(m,event.target.value)}><MenuItem value="member">สมาชิก</MenuItem><MenuItem value="planner">ดูแลแพลน</MenuItem><MenuItem value="treasurer">เหรัญญิก</MenuItem></TextField><IconButton color="error" aria-label={`นำ ${m.name} ออกจากทริป`} onClick={()=>window.confirm(`นำ ${m.name} ออกจากทริปนี้?`)&&onRemoveMember?.(m)}><DeleteOutlineRounded/></IconButton></Stack>:<Chip size="small" color={m.online ? "success" : "default"} label={m.online ? "ออนไลน์" : "ออฟไลน์"}/>}</Stack>{index < members.length - 1 && <Divider/>}</React.Fragment>)}</CardContent></Card>
     <TripVoteLinks polls={voteLinks} compact/>
     {account && <Alert severity="success">เข้าสู่ระบบด้วย {account.user.email}</Alert>}{account&&"Notification" in window&&Notification.permission!=="granted"&&<Button variant="outlined" startIcon={<NotificationsRounded/>} onClick={async()=>{const permission=await Notification.requestPermission();toast(permission==="granted"?"เปิดการแจ้งเตือนแล้ว":"ยังไม่ได้อนุญาตการแจ้งเตือน",permission==="granted"?"success":"info");}}>เปิดการแจ้งเตือนบนเครื่องนี้</Button>}
-    {canInstall&&<Button variant="outlined" startIcon={<InstallMobileRounded/>} onClick={onInstall}>ติดตั้ง TripMate บนมือถือ</Button>}{canInvite&&<Button color="inherit" startIcon={<SettingsRounded/>} onClick={onSettings}>ตั้งค่าทริปและสิทธิ์สมาชิก</Button>}<Button color="error" startIcon={<LogoutRounded/>} onClick={onLogout}>ออกจากระบบ</Button>
+    {canInstall&&<Button variant="outlined" startIcon={<InstallMobileRounded/>} onClick={onInstall}>ติดตั้ง TripMate บนมือถือ</Button>}{canInvite&&<Button color="inherit" startIcon={<SettingsRounded/>} onClick={onSettings}>ตั้งค่าทริปและสิทธิ์สมาชิก</Button>}<Button color="error" startIcon={<LogoutRounded/>} onClick={onLogout}>ออกจากระบบ</Button><ProfileImageCropDialog file={cropFile} onClose={()=>setCropFile(null)} onApply={async file=>{if(await upload(file))setCropFile(null);}}/>
   </Stack>;
 }
 
