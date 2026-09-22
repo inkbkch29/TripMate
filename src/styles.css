@@ -2,6 +2,8 @@
 :root{color-scheme:light;--ink:#20384a;--muted:#6a8090;--line:#d8eaf4;--blue:#a8ddf7;--blue-deep:#287eae;--blue-soft:#e9f8ff;--yellow:#ead28e;--yellow-soft:#fff5d8;--surface:rgba(255,255,255,.96)}
 html,body,#root{margin:0;min-height:100%;background:#f7fcff}
 body,button,input,textarea,select{font-family:"Nunito","Anuphan","Noto Sans Thai",system-ui,sans-serif}
+html,body{touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+@media(max-width:720px){input,textarea,select,.MuiInputBase-input,.MuiSelect-select{font-size:16px!important}}
 h1,h2,h3,h4,h5,h6,strong,.date-box,.now-time,.MuiTableCell-root{font-variant-numeric:lining-nums tabular-nums}
 body{overscroll-behavior:none;background:linear-gradient(125deg,#fff 0%,#f4fbff 24%,#dff4ff 50%,#eefaff 76%,#fff 100%);background-size:280% 280%;color:var(--ink);animation:sky-flow 18s ease-in-out infinite}
 @keyframes sky-flow{0%,100%{background-position:0% 45%}50%{background-position:100% 55%}}
