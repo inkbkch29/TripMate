@@ -11,7 +11,6 @@ Deno.serve(async(req)=>{
     if(!token)return reply({error:"Unauthorized"},401);
     const url=Deno.env.get("SUPABASE_URL")!;
     const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey=Deno.env.get("SUPABASE_ANON_KEY")!;
     const admin=createClient(url,serviceKey,{auth:{persistSession:false}});
     const {data:{user},error:userError}=await admin.auth.getUser(token);
     if(userError||!user)return reply({error:"Unauthorized"},401);
@@ -25,14 +24,15 @@ Deno.serve(async(req)=>{
     if(!member)return reply({error:"Member not found"},404);
     const {data:{user:target},error:targetError}=await admin.auth.admin.getUserById(memberId);
     if(targetError||!target?.email)return reply({error:"Member email not found"},404);
-    const publicClient=createClient(url,anonKey,{auth:{persistSession:false}});
     const appUrl=Deno.env.get("APP_URL")||"https://trip-mate-eta-weld.vercel.app";
     const redirectTo=new URL("?auth=recovery",appUrl).toString();
-    const {error:resetError}=await publicClient.auth.resetPasswordForEmail(target.email,{redirectTo});
+    const {data,error:resetError}=await admin.auth.admin.generateLink({type:"recovery",email:target.email,options:{redirectTo}});
     if(resetError)throw resetError;
-    return reply({sent:true});
+    const link=data?.properties?.action_link;
+    if(!link)throw new Error("Recovery link missing");
+    return reply({link});
   }catch(error){
-    console.error("Password reset email failed",error);
-    return reply({error:"ส่งอีเมลรีเซ็ตไม่สำเร็จ กรุณาลองอีกครั้ง"},500);
+    console.error("Password reset link failed",error);
+    return reply({error:"สร้างลิงก์รีเซ็ตไม่สำเร็จ กรุณาลองอีกครั้ง"},500);
   }
 });
