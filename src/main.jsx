@@ -11,7 +11,7 @@ import {
   Slider, Snackbar, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Toolbar, Typography,
 } from "@mui/material";
 import {
-  AddRounded, ArrowBackRounded, ArrowForwardRounded, CalendarMonthRounded, CameraAltRounded, CheckCircleRounded,
+  AddRounded, ChevronLeftRounded, ArrowForwardRounded, CalendarMonthRounded, CameraAltRounded, CheckCircleRounded,
   CloseRounded, ContentCopyRounded, DirectionsRounded, EditRounded, HomeRounded, LocationOnRounded, LogoutRounded,
   MapRounded, MoreHorizRounded, MyLocationRounded, NotificationsRounded, PaidRounded,
   PaymentsRounded, PersonAddRounded, PlaceRounded, QrCode2Rounded, ReceiptLongRounded, RouteRounded,
@@ -120,8 +120,8 @@ function useStoredState(key, initial) {
   return [state, setState];
 }
 
-function BusyButton({ busy, children, ...props }) {
-  return <Button {...props} disabled={busy || props.disabled} startIcon={busy ? <CircularProgress size={18} color="inherit" /> : props.startIcon}>{busy ? "กำลังบันทึก..." : children}</Button>;
+function BusyButton({ busy, children, busyLabel="กำลังดำเนินการ...", ...props }) {
+  return <Button {...props} disabled={busy || props.disabled} startIcon={busy ? <CircularProgress size={18} color="inherit" /> : props.startIcon}>{busy ? busyLabel : children}</Button>;
 }
 
 function SheetTitle({ children, description, onClose }) {
@@ -181,7 +181,8 @@ function TripVoteLinks({ polls = [], compact = false }) {
 }
 
 function Home({ members, stops, collections, expenses, setTab, onOpenMembers, trip, voteLinks }) {
-  const unpaid = collections.reduce((sum, item) => sum + item.participants.filter((id) => !item.paid.includes(id)).length, 0);
+  const unpaid = collections.reduce((sum, item) => sum + item.participants.filter((id) => !item.paid.includes(id)&&item.payments?.[id]?.status!=="pending").length, 0);
+  const nextCollection=collections.find(item=>item.participants.some(id=>!item.paid.includes(id)&&item.payments?.[id]?.status!=="pending"));
   const next = stops.find((s) => !s.done);
   const spent = expenses.reduce((sum, x) => sum + Number(x.amount), 0);
   const budgetUsage=trip?.budget?spent/Number(trip.budget):0;
@@ -197,8 +198,8 @@ function Home({ members, stops, collections, expenses, setTab, onOpenMembers, tr
     {phase==="after"&&<section className="home-recap-pulse"><Typography variant="overline">ทริปจบแล้ว</Typography><Typography variant="h5">เก็บทุกความทรงจำไว้ด้วยกัน</Typography><Typography variant="body2" color="text.secondary">ไปแล้ว {stops.filter((item)=>item.done).length} สถานที่ · ใช้จ่ายรวม {currency(spent)}</Typography><Button onClick={()=>setTab(2)} endIcon={<ArrowForwardRounded/>}>ดู Trip Recap</Button></section>}
     {budgetUsage>=.8&&<Alert severity={budgetUsage>=1?"error":"warning"}><Typography fontWeight={850}>{budgetUsage>=1?"ค่าใช้จ่ายเกินงบทริปแล้ว":`ใช้งบไป ${Math.round(budgetUsage*100)}% แล้ว`}</Typography><Typography variant="body2">ใช้ไป {currency(spent)} จากงบ {currency(trip.budget)}{budgetUsage>=1?` · เกิน ${currency(spent-trip.budget)}`:""}</Typography></Alert>}
     <Stack direction="row" spacing={1.4}>
-      <Card className="stat-card payment-snapshot interactive-card" role="button" tabIndex={0} onKeyDown={(e)=>e.key==="Enter"&&setTab(3)} onClick={() => setTab(3)}><CardContent><PaymentsRounded color="primary"/><Typography variant="caption">ต้องจ่ายเร็ว ๆ นี้</Typography><Typography variant="h6">{currency(collections[0]?.perPerson)}</Typography><Chip size="small" color={unpaid>0?"warning":"success"} label={unpaid>0?`${unpaid} คนยังไม่จ่าย`:"✓ จ่ายครบแล้ว"}/></CardContent></Card>
-      <Card className="stat-card interactive-card" role="button" tabIndex={0} onKeyDown={(e)=>e.key==="Enter"&&setTab(3)} onClick={() => setTab(3)}><CardContent><SavingsRounded color="secondary"/><Typography variant="caption">ใช้ไปแล้ว</Typography><Typography variant="h6">{currency(spent)}</Typography><Typography variant="caption" color="text.secondary">{trip?.budget ? `จากงบ ${currency(trip.budget)}` : "ยังไม่ได้ตั้งงบทริป"}</Typography></CardContent></Card>
+      <Card className="stat-card payment-snapshot interactive-card" role="button" tabIndex={0} onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setTab(3);}}} onClick={() => setTab(3)}><CardContent><PaymentsRounded color="primary"/><Typography variant="caption">รายการรอชำระ</Typography><Typography variant="h6">{nextCollection?currency(nextCollection.perPerson):"ครบแล้ว"}</Typography><Chip size="small" color={unpaid>0?"warning":"success"} label={unpaid>0?`${unpaid} รายการรอชำระ`:"✓ จ่ายครบแล้ว"}/></CardContent></Card>
+      <Card className="stat-card interactive-card" role="button" tabIndex={0} onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setTab(3);}}} onClick={() => setTab(3)}><CardContent><SavingsRounded color="secondary"/><Typography variant="caption">ใช้ไปแล้ว</Typography><Typography variant="h6">{currency(spent)}</Typography><Typography variant="caption" color="text.secondary">{trip?.budget ? `จากงบ ${currency(trip.budget)}` : "ยังไม่ได้ตั้งงบทริป"}</Typography></CardContent></Card>
     </Stack>
     <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">สมาชิกในทริป</Typography><Button size="small" onClick={onOpenMembers}>ดูทั้งหมด</Button></Stack>
     <Box className="home-members"><Stack direction="row" spacing={1.2} className="member-row">{members.map((m) => <Box key={m.id} textAlign="center"><BadgeDot active={m.online}><Avatar src={m.avatar} sx={{ bgcolor: memberColor(m) }}>{memberInitial(m)}</Avatar></BadgeDot><Typography variant="caption">{m.name}</Typography></Box>)}</Stack></Box>
@@ -450,7 +451,7 @@ function Profile({ members, setMembers, onAddMember, toast, account, activeTrip,
   const [expandedMemberId,setExpandedMemberId]=useState("");
   const visibleMembers=members.filter((member)=>{const matchesQuery=!memberQuery.trim()||member.name.toLocaleLowerCase("th-TH").includes(memberQuery.trim().toLocaleLowerCase("th-TH"));const matchesFilter=memberFilter==="all"||(memberFilter==="online"&&member.online)||(memberFilter==="admin"&&["owner","planner","treasurer"].includes(member.tripRole));return matchesQuery&&matchesFilter;});
   return <Stack spacing={2} className="profile-page settings-page">
-    <Box className="settings-heading">{settingsSection!=="home"&&<IconButton className="settings-back" aria-label="กลับไปหน้าตั้งค่า" onClick={()=>setSettingsSection("home")}><ArrowBackRounded/></IconButton>}<Box><Typography variant="h4">{settingsSection==="home"?"ตั้งค่า":settingsSection==="account"?"บัญชีของฉัน":settingsSection==="payment"?"ข้อมูลรับเงิน":settingsSection==="members"?"สมาชิกในทริป":"ทริปและแอป"}</Typography>{settingsSection==="home"&&<Typography variant="body2" color="text.secondary">ทุกอย่างของทริป อยู่ตรงนี้เลย ✨</Typography>}</Box></Box>
+    <Box className="settings-heading">{settingsSection!=="home"&&<IconButton className="settings-back" aria-label="กลับไปหน้าตั้งค่า" onClick={()=>setSettingsSection("home")}><ChevronLeftRounded/></IconButton>}<Box><Typography variant="h4">{settingsSection==="home"?"ตั้งค่า":settingsSection==="account"?"บัญชีของฉัน":settingsSection==="payment"?"ข้อมูลรับเงิน":settingsSection==="members"?"สมาชิกในทริป":"ทริปและแอป"}</Typography>{settingsSection==="home"&&<Typography variant="body2" color="text.secondary">ทุกอย่างของทริป อยู่ตรงนี้เลย ✨</Typography>}</Box></Box>
     {settingsSection==="home"&&<><Box className="settings-summary"><Avatar src={me.avatar} sx={{bgcolor:memberColor(me),width:54,height:54}}>{memberInitial(me)}</Avatar><Box><Typography fontWeight={900}>{me.name}</Typography><Typography variant="body2" color="text.secondary">{account?.user?.email||me.role}</Typography></Box></Box><Box className="settings-menu">{[{key:"account",icon:<CameraAltRounded/>,title:"บัญชีของฉัน",detail:"ชื่อและรูปโปรไฟล์"},{key:"members",icon:<GroupRounded/>,title:"สมาชิกในทริป",detail:`${members.length} คนในทริปนี้`},{key:"payment",icon:<QrCode2Rounded/>,title:"ข้อมูลรับเงิน",detail:"ชื่อบัญชีและ QR รับเงิน"},{key:"trip",icon:<SettingsRounded/>,title:"ทริปและแอป",detail:"การแจ้งเตือนและตัวเลือกอื่น ๆ"}].map(item=><button key={item.key} type="button" className="settings-tile" onClick={()=>setSettingsSection(item.key)}><span className="settings-tile-icon">{item.icon}</span><span className="settings-tile-copy"><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowForwardRounded className="settings-tile-arrow"/></button>)}</Box></>}
     {settingsSection==="account"&&<>
     <Box className="profile-identity" textAlign="center"><Box className="profile-avatar"><Avatar src={me.avatar} sx={{bgcolor:memberColor(me)}}>{memberInitial(me)}</Avatar></Box><Button className="profile-photo-button" component="label" size="small" variant="text" startIcon={busy?<CircularProgress size={16}/>:<CameraAltRounded/>} disabled={busy}>เปลี่ยนรูป<input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={selectPhoto}/></Button><Typography variant="h4" mt={.8}>{me.name}</Typography><Typography color="text.secondary">{me.role}</Typography></Box>
@@ -614,11 +615,11 @@ function AuthScreen({ inviteToken, initialMode="login", returnVote="" }) {
     } catch (err) { setError(friendlyAuthError(err.message)); }
     finally { setBusy(false); }
   };
-  return <ThemeProvider theme={theme}><Box className="auth-shell"><Card className="auth-card"><CardContent><Stack spacing={2.2}>
+  return <ThemeProvider theme={theme}><Box className="auth-shell"><Card className="auth-card"><CardContent><Stack component="form" onSubmit={(event)=>{event.preventDefault();if(!busy)submit();}} spacing={2.2}>
     <Box textAlign="center"><Avatar className="auth-logo"><TravelExploreRounded/></Avatar><Typography variant="h4">{inviteToken&&mode==="signup"?"มาเที่ยวด้วยกันนะ ✈️":"TripMate"}</Typography><Typography color="text.secondary">{inviteToken&&mode==="signup"?"สร้างบัญชีแป๊บเดียว แล้วรอเพื่อนกดยืนยันเข้าทริป":"วางแผน แชร์ และเคลียร์ค่าใช้จ่ายกับเพื่อน"}</Typography></Box>
     {inviteToken && mode!=="signup"&&<Alert severity="info">ล็อกอินแล้วระบบจะพาคุณกลับไปยังทริปที่เพื่อนเชิญอัตโนมัติ</Alert>}
     {error && <Alert severity="error">{error}</Alert>}{message && <Alert severity="success">{message}</Alert>}
-    {mode === "signup" && <TextField required error={Boolean(fieldErrors.name)} helperText={fieldErrors.name||"ชื่อที่เพื่อนเห็นในทริป"} label="ชื่อของคุณ" autoComplete="name" value={form.name} onChange={updateField("name")}/>}<TextField required error={Boolean(fieldErrors.email)} helperText={fieldErrors.email||""} label="อีเมล" type="email" autoComplete="email" inputMode="email" value={form.email} onChange={updateField("email")}/>{mode !== "reset" && <TextField required error={Boolean(fieldErrors.password)} label="รหัสผ่าน" type="password" autoComplete={mode==="signup"?"new-password":"current-password"} helperText={fieldErrors.password||(mode === "signup" ? "อย่างน้อย 6 ตัวอักษร" : "")} value={form.password} onChange={updateField("password")}/>}<BusyButton busy={busy} variant="contained" onClick={submit}>{mode === "login" ? inviteToken?"ล็อกอินและเข้าร่วมทริป":"เข้าสู่ระบบ" : mode === "signup" ? inviteToken?"สมัครและเข้าร่วมทริป":"สมัครสมาชิก" : "ส่งลิงก์ตั้งรหัสผ่าน"}</BusyButton>
+    {mode === "signup" && <TextField required error={Boolean(fieldErrors.name)} helperText={fieldErrors.name||"ชื่อที่เพื่อนเห็นในทริป"} label="ชื่อของคุณ" autoComplete="name" value={form.name} onChange={updateField("name")}/>}<TextField required error={Boolean(fieldErrors.email)} helperText={fieldErrors.email||""} label="อีเมล" type="email" autoComplete="email" inputMode="email" value={form.email} onChange={updateField("email")}/>{mode !== "reset" && <TextField required error={Boolean(fieldErrors.password)} label="รหัสผ่าน" type="password" autoComplete={mode==="signup"?"new-password":"current-password"} helperText={fieldErrors.password||(mode === "signup" ? "อย่างน้อย 6 ตัวอักษร" : "")} value={form.password} onChange={updateField("password")}/>}<BusyButton busy={busy} variant="contained" type="submit">{mode === "login" ? inviteToken?"ล็อกอินและเข้าร่วมทริป":"เข้าสู่ระบบ" : mode === "signup" ? inviteToken?"สมัครและเข้าร่วมทริป":"สมัครสมาชิก" : "ส่งลิงก์ตั้งรหัสผ่าน"}</BusyButton>
     <Stack direction="row" justifyContent="center" spacing={1}>{mode!=="reset"&&<Button size="small" onClick={() => {setMode(mode === "signup" ? "login" : "signup");setFieldErrors({});setError("");}}>{mode === "signup" ? "มีบัญชีแล้ว? เข้าสู่ระบบ" : "ยังไม่มีบัญชี? สมัครสมาชิก"}</Button>}{mode==="login"&&<Button size="small" onClick={() => {setMode("reset");setFieldErrors({});setError("");}}>ลืมรหัสผ่าน</Button>}{mode==="reset"&&<Button size="small" onClick={() => {setMode("login");setFieldErrors({});setError("");}}>กลับไปล็อกอิน</Button>}</Stack>
   </Stack></CardContent></Card></Box></ThemeProvider>;
 }
@@ -704,7 +705,8 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
   const canManageMoney = !account || ["owner","treasurer"].includes(activeTrip?.trip_role);
   const canAddStops = canPlan || activeTrip?.members_can_add_stops !== false;
   const canAddCollections = canManageMoney || Boolean(activeTrip?.members_can_add_collections);
-  const [loading, setLoading] = useState(true); const [tab, setTab] = useState(0);const [settingsSection,setSettingsSection]=useState("home"); const [dialog, setDialog] = useState(""); const [editingStop,setEditingStop]=useState(null); const [editingExpense,setEditingExpense]=useState(null); const [editingCollection,setEditingCollection]=useState(null); const [selectedQr, setSelectedQr] = useState(null); const [focusCollectionId,setFocusCollectionId]=useState(""); const [toast, setToast] = useState({ open: false, text: "", severity: "success" });
+  const [loading, setLoading] = useState(true); const [tab, setTab] = useState(0);const [settingsSection,setSettingsSection]=useState("home");
+  useEffect(()=>{window.scrollTo({top:0,behavior:"instant"});},[tab,settingsSection]); const [dialog, setDialog] = useState(""); const [editingStop,setEditingStop]=useState(null); const [editingExpense,setEditingExpense]=useState(null); const [editingCollection,setEditingCollection]=useState(null); const [selectedQr, setSelectedQr] = useState(null); const [focusCollectionId,setFocusCollectionId]=useState(""); const [toast, setToast] = useState({ open: false, text: "", severity: "success" });
   const [members, setMembers] = useStoredState("tripmate-members", membersSeed);
   const [stops, setStops] = useStoredState("tripmate-stops", stopsSeed);
   const [expenses, setExpenses] = useStoredState("tripmate-expenses", expensesSeed);
