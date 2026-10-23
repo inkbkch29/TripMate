@@ -418,11 +418,11 @@ function ProfileImageCropDialog({file,onClose,onApply}){
 }
 
 function Profile({ members, setMembers, onAddMember, toast, account, activeTrip, onLogout, canInvite = true, onSettings, onRoleChange, onRemoveMember, canInstall, onInstall, voteLinks }) {
+  const [resettingMemberId,setResettingMemberId]=useState("");
+  const sendMemberReset=async(member)=>{if(!account||!activeTrip?.id||activeTrip.trip_role!=="owner")return;setResettingMemberId(member.id);try{const {error}=await supabase.functions.invoke("send-password-reset",{body:{tripId:activeTrip.id,memberId:member.id}});if(error)throw error;toast(`ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลของ ${member.name} แล้ว`);}catch(error){toast(error.message||"ส่งลิงก์รีเซ็ตไม่สำเร็จ","error");}finally{setResettingMemberId("");}};
   const meIndex = account ? members.findIndex((m) => m.id === account.user.id) : 0; const me = members[Math.max(0,meIndex)] || membersSeed[0]; const [busy, setBusy] = useState(false); const [showPaymentQr,setShowPaymentQr]=useState(false);const [cropFile,setCropFile]=useState(null);const [memberQuery,setMemberQuery]=useState("");const [memberFilter,setMemberFilter]=useState("all");
   const selectPhoto=(event)=>{const input=event.target,file=input.files?.[0];input.value="";if(!file)return;if(!["image/jpeg","image/png","image/webp"].includes(file.type))return toast("รองรับเฉพาะ JPG, PNG หรือ WebP","error");if(file.size>15*1024*1024)return toast("ไฟล์ต้นฉบับต้องมีขนาดไม่เกิน 15 MB","error");setCropFile(file);};
   const upload = async (compressedFile) => {
-  const [resettingMemberId,setResettingMemberId]=useState("");
-  const sendMemberReset=async(member)=>{if(!account||!activeTrip?.id||activeTrip.trip_role!=="owner")return;setResettingMemberId(member.id);try{const {error}=await supabase.functions.invoke("send-password-reset",{body:{tripId:activeTrip.id,memberId:member.id}});if(error)throw error;toast(`ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลของ ${member.name} แล้ว`);}catch(error){toast(error.message||"ส่งลิงก์รีเซ็ตไม่สำเร็จ","error");}finally{setResettingMemberId("");}};
     setBusy(true);
     try {
       if (!account) {
