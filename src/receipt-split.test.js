@@ -24,3 +24,23 @@ describe('receipt splits',()=>{
  expect(expenseShares({amount:100,participants:['a','b'],shares:{a:80,b:20}})).toEqual([{userId:'a',amount:80},{userId:'b',amount:20}]);
  });
 });
+
+describe('progressive allocation',()=>{
+ it('shows allocated amounts even when some dishes are unassigned',async()=>{
+ const {receiptProgress}=await import('./receipt-split');
+ const result=receiptProgress({items:[{name:'shared',amount:1300,participants:['a','b','c','d','e','f','g']},{name:'not selected',amount:170,participants:[]}]},['a','b','c','d','e','f','g']);
+ expect(result.subtotal).toBe(1470);expect(result.allocated).toBe(1300);expect(result.unallocated).toBe(170);expect(result.unallocatedCount).toBe(1);expect(result.complete).toBe(false);
+ expect(Object.values(result.shares).reduce((sum,v)=>sum+Math.round(v*100),0)).toBe(130000);
+ });
+ it('only includes extras after every dish is allocated',async()=>{
+ const {receiptProgress}=await import('./receipt-split');
+ const bill={items:[{name:'rice',amount:100,participants:['a']},{name:'tea',amount:50,participants:[]}],serviceCharge:15};
+ expect(receiptProgress(bill,['a','b']).shares).toEqual({a:100});
+ bill.items[1].participants=['b'];expect(receiptProgress(bill,['a','b']).shares).toEqual({a:110,b:55});
+ });
+ it('does not allocate to a removed member',async()=>{
+ const {receiptProgress,receiptItemCategory}=await import('./receipt-split');
+ expect(receiptProgress({items:[{name:'rice',amount:100,participants:['removed']}]},['a']).allocated).toBe(0);
+ expect(receiptItemCategory('Rice')).toBe('food');expect(receiptItemCategory('น้ำแข็ง')).toBe('water');expect(receiptItemCategory('ชาไทย')).toBe('drink');
+ });
+});

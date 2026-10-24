@@ -55,3 +55,24 @@ export function parseReceiptText(text) {
   }
   return result;
 }
+
+export function receiptItemCategory(name='') {
+  if (/น้ำเปล่า|น้ำดื่ม|น้ำแข็ง|drinking water|\bice\b|bottled water/i.test(name)) return 'water';
+  if (/น้ำหวาน|น้ำอัดลม|ชาเย็น|ชาไทย|ชาเขียว|กาแฟ|ลาเต้|โค้ก|เป๊ปซี่|น้ำผลไม้|เบียร์|coffee|latte|tea\b|cola|beer|juice/i.test(name)) return 'drink';
+  return 'food';
+}
+
+// Show useful provisional totals while some dishes still have no consumers.
+// Extras are only included after the entire bill is valid and allocated.
+export function receiptProgress(receipt,memberIds) {
+  const allowed=new Set(memberIds);
+  const items=receipt.items||[];
+  const validAmount=item=>Number.isFinite(Number(item.amount))&&cents(item.amount)>0;
+  const assigned=items.filter(item=>validAmount(item)&&item.name?.trim()&&item.participants?.length&&item.participants.every(id=>allowed.has(id)));
+  const subtotal=items.filter(validAmount).reduce((sum,item)=>sum+cents(item.amount),0)/100;
+  const allocated=assigned.reduce((sum,item)=>sum+cents(item.amount),0)/100;
+  const result=splitReceipt(receipt,memberIds);
+  const complete=result.errors.length===0;
+  const preview=complete?result:splitReceipt({items:assigned},memberIds);
+  return {subtotal,allocated,unallocated:Math.round((subtotal-allocated)*100)/100,unallocatedCount:items.length-assigned.length,complete,shares:preview.shares,total:preview.total,errors:result.errors};
+}

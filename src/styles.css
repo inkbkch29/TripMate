@@ -299,3 +299,10 @@ main{padding:22px 18px 38px}
 .payment-slip-media iframe{display:block;width:100%;height:60vh;border:0}
 .payment-slip-dialog .MuiDialogTitle-root{overflow-wrap:anywhere}
 .payment-history summary{cursor:pointer;font-weight:750;padding:12px 0}
+.receipt-progress{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.receipt-progress>div{padding:12px;background:#eef8fd;border-radius:14px}
+.receipt-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 8px}
+.receipt-people .MuiFormControlLabel-root{margin:0;min-width:0;overflow-wrap:anywhere}
+.receipt-person-summary{border:1px solid #d9eaf4;border-radius:14px;padding:12px}
+.receipt-person-summary summary{cursor:pointer;color:#287faf;font-size:.8rem;padding:8px 0}
+@media(max-width:360px){.receipt-progress{grid-template-columns:1fr}.receipt-people{grid-template-columns:1fr}}
