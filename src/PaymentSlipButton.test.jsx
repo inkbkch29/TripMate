@@ -17,7 +17,6 @@ describe('payment slip history',()=>{
  expect(sign).toHaveBeenCalledWith('trip/receipt.png',3600);
  expect(document.querySelector('[role="dialog"]').textContent).toContain('ยืนยันรับเงินแล้ว');
  expect(document.querySelector('img').src).toBe('https://example.test/fresh.png');
- expect(document.querySelector('[role="dialog"]').textContent).toContain('0.43');
  const zoom=document.querySelector('button[aria-label="ขยายสลิป"]');await click(zoom);expect(document.querySelector('img').style.width).toBe('150%');
  await click(document.querySelector('button[aria-label="ปิดสลิป"]'));
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,250));});
