@@ -237,6 +237,7 @@ export function subscribeToTripActivity(tripId,onChange) {
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_stops",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("plan",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"expenses",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("expense",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"collections",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("collection",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_settlements",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("settlement",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_stop_checkins"},(payload)=>onChange("checkin",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_checklist_items",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("checklist",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"collection_payments"},(payload)=>onChange("payment",payload))
