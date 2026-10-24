@@ -44,3 +44,20 @@ describe('progressive allocation',()=>{
  expect(receiptItemCategory('Rice')).toBe('food');expect(receiptItemCategory('น้ำแข็ง')).toBe('water');expect(receiptItemCategory('ชาไทย')).toBe('drink');
  });
 });
+
+describe('rounded food charges',()=>{
+ it('rounds each final person total after tax and discount',async()=>{
+  const {receiptProgress}=await import('./receipt-split');
+  const result=receiptProgress({roundUp:true,items:[{name:'Rice',amount:100,participants:['a']},{name:'Tea',amount:50,participants:['a','b']}],serviceCharge:15,tax:11.55,discount:5},['a','b','c']);
+  expect(result.costTotal).toBe(171.55);expect(result.costShares).toEqual({a:142.96,b:28.59});expect(result.shares).toEqual({a:143,b:29});expect(result.total).toBe(172);expect(result.fundShares).toEqual({a:.04,b:.41});expect(result.fundRemainder).toBe(.45);
+ });
+ it('rounds once per person rather than once per food line',async()=>{
+  const {receiptProgress}=await import('./receipt-split');
+  const result=receiptProgress({roundUp:true,items:[{name:'A',amount:10.2,participants:['a']},{name:'B',amount:10.2,participants:['a']}]},['a','b']);
+  expect(result.shares).toEqual({a:21});expect(result.fundRemainder).toBe(.6);
+ });
+ it('keeps a whole baht bill unchanged and does not charge people who ate nothing',async()=>{
+  const {receiptProgress}=await import('./receipt-split');
+  const result=receiptProgress({roundUp:true,items:[{name:'A',amount:100,participants:['a']}]},['a','b']);expect(result.shares).toEqual({a:100});expect(result.fundRemainder).toBe(0);
+ });
+});

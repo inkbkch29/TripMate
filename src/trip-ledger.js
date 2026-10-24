@@ -14,7 +14,7 @@ export function collectionFundTotals(collection) {
   const amount=cents(collectionPaymentAmount(collection,id));
   const newcomer=collection.lateJoin?.newcomers?.includes(id);
   const index=original.indexOf(id);
-  const planned=collection.isFund?amount:newcomer?(collection.lateJoin.mode==='fund'?amount:0):Math.floor(expected/Math.max(1,original.length))+(index<expected%Math.max(1,original.length)?1:0);
+  const planned=collection.isFund?amount:collection.fundShares?.[id]!=null?cents(collection.fundShares[id]):newcomer?(collection.lateJoin.mode==='fund'?amount:0):Math.floor(expected/Math.max(1,original.length))+(index<expected%Math.max(1,original.length)?1:0);
   const paid=collectionPaymentConfirmed(collection,id);
   const extra=paid?Math.max(0,cents(collection.payments?.[id]?.receivedAmount??amount/100)-amount):0;
   target+=planned+extra;if(paid)received+=planned+extra;
@@ -32,17 +32,19 @@ export function collectionFundTotals(collection) {
 // unallocated expense-settlement action to pay a collection a second time.
 export function tripLedger(expenses,collections,settlements,memberIds){
  const approved=expenses.filter(e=>!e.approvalStatus||e.approvalStatus==='approved');
- const expenseBalances=calculateBalances(approved,memberIds);
+ const eligibleCollections=collections.filter(c=>!c.expenseId||approved.some(e=>e.id===c.expenseId));
+ const linkedIds=new Set(eligibleCollections.map(c=>c.expenseId).filter(Boolean));
+ const expenseBalances=calculateBalances(approved.filter(e=>!linkedIds.has(e.id)),memberIds);
  for(const payment of settlements.filter(p=>p.status==='confirmed')){
   if(!memberIds.includes(payment.from)||!memberIds.includes(payment.to))continue;
   expenseBalances[payment.from]+=Number(payment.amount);expenseBalances[payment.to]-=Number(payment.amount);
  }
  const expenseTransfers=simplifyDebts(expenseBalances);
  const dues=[];let cost=cents(approved.reduce((sum,e)=>sum+Number(e.amount),0));let fundExpected=0,fundReceived=0;
- for(const collection of collections){
+ for(const collection of eligibleCollections){
   const participants=[...new Set(collection.participants||[])];
   const fundOnly=Boolean(collection.isFund);
-  if(!fundOnly)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
+  if(!fundOnly&&!collection.expenseId)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
   const funding=collectionFundTotals(collection);
   fundExpected+=cents(funding.expected);fundReceived+=cents(funding.received);
   participants.forEach(id=>{

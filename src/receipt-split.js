@@ -74,5 +74,18 @@ export function receiptProgress(receipt,memberIds) {
   const result=splitReceipt(receipt,memberIds);
   const complete=result.errors.length===0;
   const preview=complete?result:splitReceipt({items:assigned},memberIds);
-  return {subtotal,allocated,unallocated:Math.round((subtotal-allocated)*100)/100,unallocatedCount:items.length-assigned.length,complete,shares:preview.shares,total:preview.total,errors:result.errors};
+  const rounded=complete&&receipt.roundUp?roundReceiptShares(preview.shares):null;
+  return {costShares:preview.shares,fundShares:rounded?.fundShares||{},fundRemainder:rounded?.fundRemainder||0,costTotal:preview.total,subtotal,allocated,unallocated:Math.round((subtotal-allocated)*100)/100,unallocatedCount:items.length-assigned.length,complete,shares:rounded?.chargedShares||preview.shares,total:rounded?.chargedTotal??preview.total,errors:result.errors};
+}
+
+// Round once per person's final bill share, after service/tax/discount.
+export function roundReceiptShares(shares) {
+ const chargedShares={},fundShares={};let cost=0,charged=0;
+ for(const [id,value] of Object.entries(shares||{})){
+  const amount=cents(value);if(!Number.isSafeInteger(amount)||amount<0)throw new Error('Invalid receipt share');
+  const rounded=Math.ceil(amount/100)*100;
+  chargedShares[id]=rounded/100;fundShares[id]=(rounded-amount)/100;
+  cost+=amount;charged+=rounded;
+ }
+ return {chargedShares,fundShares,originalTotal:cost/100,chargedTotal:charged/100,fundRemainder:(charged-cost)/100};
 }
