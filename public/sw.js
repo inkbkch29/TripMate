@@ -19,7 +19,7 @@ self.addEventListener("fetch",(event)=>{
 
   if(request.mode==="navigate"){
     event.respondWith(fetch(request).then((response)=>{
-      if(response.ok)caches.open(CACHE).then((cache)=>cache.put("/",response.clone()));
+      if(response.ok){const cachedResponse=response.clone();event.waitUntil(caches.open(CACHE).then((cache)=>cache.put("/",cachedResponse)));}
       return response;
     }).catch(()=>caches.match("/")));
     return;
@@ -27,7 +27,7 @@ self.addEventListener("fetch",(event)=>{
 
   event.respondWith(caches.match(request).then((cached)=>cached||fetch(request).then((response)=>{
     if(response.ok&&["script","style","image","font"].includes(request.destination)){
-      caches.open(CACHE).then((cache)=>cache.put(request,response.clone()));
+      const cachedResponse=response.clone();event.waitUntil(caches.open(CACHE).then((cache)=>cache.put(request,cachedResponse)));
     }
     return response;
   })));

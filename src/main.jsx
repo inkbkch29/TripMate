@@ -835,6 +835,18 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
     return()=>{mounted=false;stopFallback();document.removeEventListener("visibilitychange",onVisible);unsubscribe();};
   },[activeTrip?.id,account?.user.id,members.length]);
   useEffect(()=>{if(!activeTrip||!account)return;let refreshTimer;const unsubscribe=subscribeToTripActivity(activeTrip.id,(type,payload)=>{if(type==="activity"&&payload.new?.actor_id===account.user.id&&payload.new?.id)sendActivityPush(payload.new.id).catch(()=>{});window.clearTimeout(refreshTimer);refreshTimer=window.setTimeout(()=>loadTripData(activeTrip.id).then((data)=>{setMembers(data.members);setStops(data.stops);setExpenses(data.expenses);setCollections(data.collections);setSettlements(data.settlements||[]);setCheckins(data.checkins||[]);setLocationHistory(data.locationHistory||[]);setRouteDistanceTotal(data.routeDistance||0);setChecklist(data.checklist||[]);}).catch(()=>{}),450);});return()=>{window.clearTimeout(refreshTimer);unsubscribe();};},[activeTrip?.id,account?.user.id]);
+  useEffect(()=>{
+    if(!activeTrip?.id||!account||tab!==3||dialog)return;
+    let active=true,timer;
+    const refresh=async()=>{
+      if(document.visibilityState!=="visible")return;
+      try{const data=await loadTripData(activeTrip.id);if(active){setExpenses(data.expenses);setCollections(data.collections);setSettlements(data.settlements||[]);}}catch{}
+    };
+    const schedule=()=>{timer=window.setTimeout(async()=>{await refresh();if(active)schedule();},15000);};
+    const resume=()=>{if(document.visibilityState==="visible")refresh();};
+    refresh();schedule();window.addEventListener("focus",resume);window.addEventListener("online",resume);document.addEventListener("visibilitychange",resume);
+    return()=>{active=false;window.clearTimeout(timer);window.removeEventListener("focus",resume);window.removeEventListener("online",resume);document.removeEventListener("visibilitychange",resume);};
+  },[activeTrip?.id,account?.user.id,tab,dialog]);
   useEffect(()=>{if(account)return subscribeToProfiles((payload)=>{const profile=payload.new;if(!profile?.id)return;setMembers((old)=>old.map((member)=>member.id===profile.id?{...member,name:profile.display_name||member.name,avatar:profile.avatar_url||"",accountName:profile.account_name||""}:member));});},[account?.user.id]);
   useEffect(()=>{if(!account)return;let mounted=true;const refresh=()=>Promise.all([loadNotifications(),loadNotificationPreferences()]).then(([rows,prefs])=>{if(mounted){setPersistentNotifications(rows);setNotificationPreferences(prefs);}}).catch(()=>{});const unsubscribe=subscribeToNotifications(account.user.id,refresh);refresh();return()=>{mounted=false;unsubscribe();};},[account?.user.id]);
   useEffect(()=>{const handler=(event)=>{event.preventDefault();setInstallPrompt(event);};window.addEventListener("beforeinstallprompt",handler);return()=>window.removeEventListener("beforeinstallprompt",handler);},[]);
