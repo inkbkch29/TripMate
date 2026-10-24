@@ -27,7 +27,9 @@ export function tripLedger(expenses,collections,settlements,memberIds){
    const fund=fundOnly?amount:newcomer?(collection.lateJoin.mode==='fund'?amount:0):Math.floor(expected/Math.max(1,original.length))+(index<expected%Math.max(1,original.length)?1:0);
    fundExpected+=fund;
    const paid=collectionPaymentConfirmed(collection,id);
-   if(paid)fundReceived+=fund;
+   const extra=paid?Math.max(0,cents(collection.payments?.[id]?.receivedAmount??amount/100)-amount):0;
+   fundExpected+=extra;
+   if(paid)fundReceived+=fund+extra;
    if(id!==collection.receiver&&!paid&&amount>0)dues.push({collectionId:collection.id,title:collection.title,from:id,to:collection.receiver,amount:amount/100,fund:fundOnly,status:collection.payments?.[id]?.status||'unpaid'});
   });
  }

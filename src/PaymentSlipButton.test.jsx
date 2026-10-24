@@ -12,11 +12,12 @@ const mount=async payment=>act(async()=>root.render(<PaymentSlipButton payment={
 describe('payment slip history',()=>{
  it('opens an approved payment in a popup and refreshes its signed link',async()=>{
  sign.mockResolvedValue({data:{signedUrl:'https://example.test/fresh.png'}});
- await mount({status:'paid',slipPath:'trip/receipt.png',slipUrl:'https://example.test/expired.png'});
+ await mount({status:'paid',receivedAmount:100.43,slipPath:'trip/receipt.png',slipUrl:'https://example.test/expired.png'});
  await click(host.querySelector('button'));
  expect(sign).toHaveBeenCalledWith('trip/receipt.png',3600);
  expect(document.querySelector('[role="dialog"]').textContent).toContain('ยืนยันรับเงินแล้ว');
  expect(document.querySelector('img').src).toBe('https://example.test/fresh.png');
+ expect(document.querySelector('[role="dialog"]').textContent).toContain('0.43');
  const zoom=document.querySelector('button[aria-label="ขยายสลิป"]');await click(zoom);expect(document.querySelector('img').style.width).toBe('150%');
  await click(document.querySelector('button[aria-label="ปิดสลิป"]'));
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,250));});

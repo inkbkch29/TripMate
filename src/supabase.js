@@ -165,7 +165,7 @@ export async function loadTripData(tripId) {
       const receiptUrl = signedByPath[e.receipt_path]||"";
       return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptBreakdown:e.receipt_breakdown||null, receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
     }),
-    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, createdAt:c.created_at, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
+    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, createdAt:c.created_at, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, amount:Number(p.amount), receivedAmount:p.received_amount==null?null:Number(p.received_amount), submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
     settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
@@ -391,9 +391,9 @@ export async function saveCollection(tripId, userId, collection) {
   if (paymentError) throw paymentError;
 }
 
-export async function confirmCollectionPayment(collectionId, memberId) {
-  const { error } = await supabase.from("collection_payments").update({ status: "paid", confirmed_at: new Date().toISOString() }).eq("collection_id", collectionId).eq("user_id", memberId);
-  if (error) throw error;
+export async function confirmCollectionPayment(collectionId, memberId, receivedAmount) {
+  const {error}=await supabase.rpc("confirm_collection_received",{target_collection:collectionId,target_user:memberId,actual_amount:receivedAmount});
+  if(error)throw error;
 }
 
 export async function submitCollectionPayment(collectionId,userId,slipPath,paidForUserId=userId){
