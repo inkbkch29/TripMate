@@ -237,14 +237,18 @@ export function subscribeToTripActivity(tripId,onChange) {
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_stops",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("plan",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"expenses",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("expense",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"collections",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("collection",payload))
-    .on("postgres_changes",{event:"*",schema:"public",table:"trip_settlements",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("settlement",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_stop_checkins"},(payload)=>onChange("checkin",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_checklist_items",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("checklist",payload))
-    .on("postgres_changes",{event:"*",schema:"public",table:"collection_payments"},(payload)=>onChange("payment",payload))
     .on("postgres_changes",{event:"*",schema:"public",table:"trip_members",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("member",payload))
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"trip_activity_log",filter:`trip_id=eq.${tripId}`},(payload)=>onChange("activity",payload))
     .subscribe();
-  return ()=>supabase.removeChannel(channel);
+  // Keep payment updates independent of optional trip tables. A missing
+  // publication on another table must not prevent slip status updates.
+  const financeChannel=supabase.channel(`trip-payments-${tripId}-${crypto.randomUUID()}`)
+    .on("postgres_changes",{event:"*",schema:"public",table:"collection_payments"},payload=>onChange("payment",payload))
+    .on("postgres_changes",{event:"*",schema:"public",table:"trip_settlements",filter:`trip_id=eq.${tripId}`},payload=>onChange("settlement",payload))
+    .subscribe();
+  return ()=>{supabase.removeChannel(channel);supabase.removeChannel(financeChannel);};
 }
 
 export function subscribeToProfiles(onChange){
