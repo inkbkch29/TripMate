@@ -1,3 +1,4 @@
+import { splitAmount } from "./finance";
 import { createClient } from "@supabase/supabase-js";
 import { tripFilePath } from "./trip-utils";
 import { compressImage } from "./image-utils";
@@ -162,7 +163,7 @@ export async function loadTripData(tripId) {
     stops: stopResult.data.map((s) => ({ id: s.id, day: s.day_number, time: s.start_time?.slice(0,5) || "", title: s.title, place: s.place_name, note: s.note || "", latitude:s.latitude, longitude:s.longitude, googleMapsUrl:s.google_maps_url||"", sortOrder:s.sort_order, done: s.is_done, revision:s.revision||1, updatedAt:s.updated_at })),
     expenses: expenseResult.data.map((e) => {
       const receiptUrl = signedByPath[e.receipt_path]||"";
-      return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
+      return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptBreakdown:e.receipt_breakdown||null, receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
     }),
     collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund), perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
@@ -291,16 +292,12 @@ export async function reorderTripStops(tripId,orderedStops){
 }
 
 export async function saveExpense(tripId, userId, expense) {
-  const row={ id: expense.id, trip_id: tripId, title: expense.title, amount: expense.amount, paid_by: expense.paidBy, category: expense.category, expense_date: expense.expenseDate, meal_period: expense.category === "อาหาร" ? expense.mealPeriod || "other" : "other", created_by: expense.createdBy || userId, split_method: expense.splitMethod || "equal", approval_status: expense.approvalStatus || "pending", receipt_path: expense.receiptPath || null };
-  const query=expense.revision
-    ?supabase.from("expenses").update(row).eq("id",expense.id).eq("trip_id",tripId).eq("revision",expense.revision).select("revision,updated_at").maybeSingle()
-    :supabase.from("expenses").insert(row).select("revision,updated_at").single();
-  const {data,error}=await query;if(error)throw error;
+  const row={ id: expense.id, trip_id: tripId, title: expense.title, amount: Math.round(Number(expense.amount)*100)/100, paid_by: expense.paidBy, category: expense.category, expense_date: expense.expenseDate, meal_period: expense.category === "อาหาร" ? expense.mealPeriod || "other" : "other", created_by: expense.createdBy || userId, split_method: expense.splitMethod || "equal", approval_status: expense.approvalStatus || "pending", receipt_path: expense.receiptPath || null, receipt_breakdown: expense.receiptBreakdown || null };
+  const fallback=Object.fromEntries(splitAmount(expense.amount,expense.participants).map(share=>[share.userId,share.amount]));
+  const shares=expense.participants.map(id=>Math.round(Number(expense.shares?.[id]??fallback[id])*100)/100);
+  const {data,error}=await supabase.rpc("save_expense_with_shares",{payload:row,participant_ids:expense.participants,share_amounts:shares,expected_revision:expense.revision||null});
+  if(error)throw error;
   if(!data){const conflict=new Error("รายจ่ายนี้ถูกแก้จากอีกเครื่องแล้ว กรุณาโหลดข้อมูลล่าสุด");conflict.code="TRIPMATE_CONFLICT";throw conflict;}
-  const equalShare = Number(expense.amount) / expense.participants.length;
-  const shares=expense.participants.map((id)=>Number(expense.shares?.[id]??equalShare));
-  const { error: shareError } = await supabase.rpc("replace_expense_participants",{target_expense:expense.id,target_users:expense.participants,target_shares:shares});
-  if (shareError) throw shareError;
   return {...expense,revision:data.revision,updatedAt:data.updated_at};
 }
 

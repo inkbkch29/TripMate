@@ -16,12 +16,30 @@ export const calculateBalances = (expenses, memberIds) => {
     const amount = Number(expense.amount);
     if (!balance.hasOwnProperty(expense.paidBy) || !Number.isFinite(amount)) return;
     balance[expense.paidBy] += amount;
-    splitAmount(amount, expense.participants).forEach(({ userId, amount: share }) => {
+    expenseShares(expense).forEach(({ userId, amount: share }) => {
       if (balance.hasOwnProperty(userId)) balance[userId] -= share;
     });
   });
   return Object.fromEntries(Object.entries(balance).map(([id, value]) => [id, Math.round(value * 100) / 100]));
 };
+
+// Shares returned by the database are amounts, including for percentage splits.
+// Preserve those amounts instead of dividing a custom/receipt bill equally again.
+export function expenseShares(expense) {
+  const people = [...new Set(expense.participants || [])];
+  const amounts = people.map(id => Number(expense.shares?.[id]));
+  const target = Math.round(Number(expense.amount) * 100);
+  if (people.length && amounts.every(value => Number.isFinite(value) && value >= 0)) {
+    const rows = people.map((userId,index) => ({ userId, cents: Math.round(amounts[index]*100) }));
+    const delta = target - rows.reduce((sum,row) => sum+row.cents,0);
+    if (Math.abs(delta) <= 1) {
+      const row = rows.find(row => row.cents > 0) || rows[0];
+      row.cents += delta;
+      return rows.map(row => ({userId:row.userId,amount:row.cents/100}));
+    }
+  }
+  return splitAmount(expense.amount, people);
+}
 
 export const simplifyDebts = (balances) => {
   const creditors = Object.entries(balances)

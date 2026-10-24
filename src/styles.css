@@ -283,3 +283,13 @@ main{padding:22px 18px 38px}
 .settings-back{min-width:44px;min-height:44px}.settings-back .MuiSvgIcon-root{font-size:1.8rem}.settings-page .MuiIconButton-root{min-width:44px;min-height:44px}.settings-page .MuiButton-root{min-height:44px}.settings-page{padding-bottom:24px}.settings-page .settings-summary{padding-block:5px}.settings-page .settings-tile{min-height:72px}.settings-page .member-setting-copy{overflow-wrap:anywhere}.MuiDialogContent-root{min-width:0;overflow-x:hidden}.MuiDialogActions-root{flex-wrap:wrap;gap:6px}.MuiDialogActions-root>.MuiButton-root{min-height:44px}button:focus-visible,a:focus-visible,[role="button"]:focus-visible{outline:3px solid #65b6cc;outline-offset:3px}.home-members .MuiTypography-caption{display:block;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.settings-page .compact-search input{min-width:0}@media(max-width:360px){.compact-member-tools{grid-template-columns:minmax(0,1fr)!important}.settings-tile{padding-inline:12px}.settings-tile-copy strong{font-size:.88rem}.settings-heading h4{font-size:1.45rem}.MuiDialogActions-root>.MuiButton-root{flex:1}}@media(prefers-reduced-motion:reduce){.settings-tile,.MuiButton-root,.MuiIconButton-root{transition:none!important;animation:none!important}}
 
 @media(max-width:560px){.person-expense-table .MuiTable-root{min-width:0;width:100%;table-layout:fixed}.person-expense-table .MuiTableCell-root{padding:10px 4px;font-size:.68rem;white-space:normal;overflow-wrap:anywhere}.person-expense-table .MuiTableCell-root:first-child{width:25%}.person-expense-table .MuiAvatar-root{display:none}.person-expense-table .MuiTypography-root{font-size:.68rem;white-space:normal}.person-expense-table .MuiStack-root{gap:0}.person-expense-table .MuiStack-root>.MuiTypography-root{margin-left:0}.person-expense-summary>.MuiCardContent-root{padding:12px!important}}
+
+/* Receipt review stays readable on narrow screens. */
+.receipt-fieldset{border:0;padding:0;margin:0;min-width:0}
+.receipt-intro,.receipt-split-summary{background:#eef8fd;border-radius:16px;padding:14px}
+.receipt-item{border:1px solid #d9eaf4;border-radius:16px;padding:12px;min-width:0}
+.receipt-item-inputs{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:10px}
+.receipt-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.receipt-photo{max-width:100%;width:100%;max-height:240px;object-fit:contain;border-radius:12px;background:#f5f8fa}
+.receipt-raw-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:220px;overflow:auto}
+@media(max-width:480px){.receipt-extras{grid-template-columns:1fr}.receipt-item-inputs{grid-template-columns:1fr}.receipt-editor .MuiButton-root{max-width:100%;overflow-wrap:anywhere}}
