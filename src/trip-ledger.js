@@ -3,6 +3,31 @@ const cents=value=>Math.round(Number(value||0)*100);
 export const collectionPaymentAmount=(collection,id)=>Number(collection.payments?.[id]?.amount??(collection.lateJoin?.newcomers?.includes(id)?collection.lateJoin.perPerson:collection.perPerson)??0);
 export const collectionPaymentConfirmed=(collection,id)=>collection.paid?.includes(id)||collection.payments?.[id]?.status==='paid';
 
+// Legacy per-person dues may be short of the bill by a few cents. Once all
+// actual receipts are known, reconcile against the real bill, not rounded dues.
+export function collectionFundTotals(collection) {
+ const participants=[...new Set(collection.participants||[])];
+ const original=participants.filter(id=>!collection.lateJoin?.newcomers?.includes(id));
+ const expected=cents(collection.fundRemainder||0);
+ let target=0,received=0;
+ for(const id of participants){
+  const amount=cents(collectionPaymentAmount(collection,id));
+  const newcomer=collection.lateJoin?.newcomers?.includes(id);
+  const index=original.indexOf(id);
+  const planned=collection.isFund?amount:newcomer?(collection.lateJoin.mode==='fund'?amount:0):Math.floor(expected/Math.max(1,original.length))+(index<expected%Math.max(1,original.length)?1:0);
+  const paid=collectionPaymentConfirmed(collection,id);
+  const extra=paid?Math.max(0,cents(collection.payments?.[id]?.receivedAmount??amount/100)-amount):0;
+  target+=planned+extra;if(paid)received+=planned+extra;
+ }
+ let adjustment=0;
+ if(!collection.isFund&&!collection.lateJoin&&participants.length&&participants.every(id=>collectionPaymentConfirmed(collection,id)&&collection.payments?.[id]?.receivedAmount!=null)){
+  const actual=participants.reduce((sum,id)=>sum+cents(collection.payments[id].receivedAmount),0);
+  const surplus=Math.max(0,actual-cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0))));
+  adjustment=received-surplus;received=surplus;target=Math.max(0,target-adjustment);
+ }
+ return {expected:target/100,received:received/100,roundingAdjustment:adjustment/100};
+}
+
 // Collection dues retain their recipient and payment record. Never use the
 // unallocated expense-settlement action to pay a collection a second time.
 export function tripLedger(expenses,collections,settlements,memberIds){
@@ -18,18 +43,11 @@ export function tripLedger(expenses,collections,settlements,memberIds){
   const participants=[...new Set(collection.participants||[])];
   const fundOnly=Boolean(collection.isFund);
   if(!fundOnly)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
-  const original=participants.filter(id=>!collection.lateJoin?.newcomers?.includes(id));
-  const expected=cents(collection.fundRemainder||0);
+  const funding=collectionFundTotals(collection);
+  fundExpected+=cents(funding.expected);fundReceived+=cents(funding.received);
   participants.forEach(id=>{
    const amount=cents(collectionPaymentAmount(collection,id));
-   const newcomer=collection.lateJoin?.newcomers?.includes(id);
-   const index=original.indexOf(id);
-   const fund=fundOnly?amount:newcomer?(collection.lateJoin.mode==='fund'?amount:0):Math.floor(expected/Math.max(1,original.length))+(index<expected%Math.max(1,original.length)?1:0);
-   fundExpected+=fund;
    const paid=collectionPaymentConfirmed(collection,id);
-   const extra=paid?Math.max(0,cents(collection.payments?.[id]?.receivedAmount??amount/100)-amount):0;
-   fundExpected+=extra;
-   if(paid)fundReceived+=fund+extra;
    if(id!==collection.receiver&&!paid&&amount>0)dues.push({collectionId:collection.id,title:collection.title,from:id,to:collection.receiver,amount:amount/100,fund:fundOnly,status:collection.payments?.[id]?.status||'unpaid'});
   });
  }

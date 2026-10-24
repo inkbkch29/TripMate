@@ -38,3 +38,10 @@ describe('received rounding money',()=>{
   expect(tripLedger([],[c],[],['a','b']).fundReceived).toBe(0);
  });
 });
+
+it('reconciles legacy 603.57 dues against the actual 8450 bill for all 14 confirmed receipts',()=>{
+ const people=Array.from({length:14},(_,i)=>String(i));
+ const collection={amount:8450,originalAmount:8450,fundRemainder:0,perPerson:603.57,receiver:'0',participants:people,paid:people,payments:Object.fromEntries(people.map(id=>[id,{amount:603.57,status:'paid',receivedAmount:604}]))};
+ const result=tripLedger([],[collection],[],people);
+ expect(result.cost).toBe(8450);expect(result.fundReceived).toBe(6);expect(result.fundExpected).toBe(6);expect(result.dues).toHaveLength(0);
+});
