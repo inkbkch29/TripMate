@@ -14,11 +14,11 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
  const generation=useRef(0);
  const [draft,setDraft]=useState([]);
  useEffect(()=>{setDraft(orderRecapStops(stops).map(p=>({...p,enabled:true,title:p.title||p.place||'สถานที่'})));setCustom('');setSource('cover');setCrop({zoom:1,x:50,y:50});},[trip?.id]);
- useEffect(()=>{setDraft(old=>orderRecapStops(stops).map(p=>{const saved=old.find(d=>d.id===p.id);return {...p,enabled:saved?.enabled??true,title:saved?.title??p.title??p.place??'สถานที่'};}));},[JSON.stringify(stops.map(p=>[p.id,p.title,p.day,p.time,p.sortOrder,p.latitude,p.longitude]))]);
+ useEffect(()=>{setDraft(old=>orderRecapStops(stops).map(p=>{const saved=old.find(d=>d.id===p.id);return {...p,enabled:saved?.enabled??true,title:saved?.title??p.title??p.place??'สถานที่'};}));},[JSON.stringify(stops.map(p=>[p.id,p.title,p.day,p.time,p.sortOrder,p.latitude,p.longitude,p.googleMapsUrl]))]);
  useEffect(()=>{return()=>{if(custom)URL.revokeObjectURL(custom);};},[custom]);
  const imageSrc=source==='custom'?custom:source==='cover'?(trip?.cover_url||'/assets/trip-hero-landscape-v4.webp'):'';
  const places=draft.filter(p=>p.enabled).map(p=>({...p,title:p.title.trim()||p.place||'สถานที่'}));
- const mapState=useRecapMap(places);
+ const mapState=useRecapMap(places,trip?.id);
  useEffect(()=>{
   if(!open)return;
   if(showRoute&&mapState.status!=='ready'){setPreview({url:'',blob:null,busy:false});setError(mapState.status==='loading'?'กำลังเตรียมแผนที่ก่อนสร้างรูป…':'แผนที่ยังไม่พร้อม กรุณาเพิ่มพิกัดหรือลองใหม่ หรือปิดแผนที่ในรูป');return;}let active=true;const id=++generation.current;setPreview(old=>({...old,busy:true}));

@@ -1,10 +1,6 @@
+import {coordinatePair,googleMapsCoordinate} from './google-maps-coordinate';
 export const ROUTE_PROVIDER='https://routing.openstreetmap.de/routed-car/route/v1/driving/';
-export function stopCoordinate(stop){
- const valid=value=>value!==null&&value!==undefined&&String(value).trim()!==''&&Number.isFinite(Number(value));
- if(!valid(stop.longitude)||!valid(stop.latitude))return null;
- const point=[Number(stop.longitude),Number(stop.latitude)];
- return Math.abs(point[0])<=180&&Math.abs(point[1])<=85.051128?point:null;
-}
+export function stopCoordinate(stop){return coordinatePair(stop.longitude,stop.latitude)||googleMapsCoordinate(stop.googleMapsUrl);}
 export function orderRecapStops(stops){return stops.map((stop,index)=>({stop,index})).sort((a,b)=>String(a.stop.day||'').localeCompare(String(b.stop.day||''),undefined,{numeric:true})||((Number.isFinite(a.stop.sortOrder)?a.stop.sortOrder:a.index)-(Number.isFinite(b.stop.sortOrder)?b.stop.sortOrder:b.index))||String(a.stop.time||'').localeCompare(String(b.stop.time||''))||a.index-b.index).map(({stop})=>stop);}
 export function markerLabel(index){let label='';for(let n=index+1;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label;}
 export function routeKey(stops){return JSON.stringify(stops.map(stopCoordinate));}
