@@ -14,17 +14,6 @@ export function storyDateLabel(trip,dateLabel=''){
  const start=Date.parse(`${trip?.start_date}T00:00:00Z`),end=Date.parse(`${trip?.end_date}T00:00:00Z`),days=Math.round((end-start)/86400000)+1;
  return dateLabel&&!dateLabel.includes('วัน')&&Number.isFinite(days)&&days>0?`${dateLabel} · ${days} วัน`:dateLabel;
 }
-function drawRouteNames(ctx,places){
- if(!places.length)return;
- ctx.font='500 25px "Anuphan",sans-serif';const names=places.map((p,i)=>`${i+1} · ${p.title||p.place||'สถานที่'}`);
- let line='',row=0;
- for(let i=0;i<names.length;i++){
-  const next=line?`${line}  →  ${names[i]}`:names[i];
-  if(ctx.measureText(next).width>920&&line){ctx.fillText(line,80,1240+row*39);row++;line=names[i];if(row===1){ctx.fillText(ellipsis(ctx,names.slice(i).join('  →  '),920),80,1279);return;}}
-  else line=next;
- }
- ctx.fillText(ellipsis(ctx,line,920),80,1240+row*39);
-}
 export async function renderRecapStory({trip,dateLabel,members=[],places=[],total=0,themeId='minimal',imageSrc='',crop={},showExpenses=true,showRoute=true,fileType='image/png'}){
  await document.fonts?.ready;
  const [photo,avatars]=await Promise.all([loadRecapImage(imageSrc),loadParticipantImages(members)]);
@@ -35,11 +24,10 @@ export async function renderRecapStory({trip,dateLabel,members=[],places=[],tota
  const shade=ctx.createLinearGradient(0,0,0,height);shade.addColorStop(0,'rgba(15,31,40,.16)');shade.addColorStop(.3,'rgba(15,31,40,0)');shade.addColorStop(.5,'rgba(15,31,40,.22)');shade.addColorStop(.68,'rgba(15,31,40,.66)');shade.addColorStop(1,'rgba(10,25,32,.88)');ctx.fillStyle=shade;ctx.fillRect(0,0,1080,height);
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.shadowColor='rgba(9,24,32,.38)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
  ctx.font='800 25px Nunito,sans-serif';ctx.fillText('TRIPMATE / THE MEMORY EDIT',80,110);
- if(showRoute)drawNumberedRoute(ctx,places.length,{x:130,y:240,width:820,height:530});
+ if(showRoute)drawNumberedRoute(ctx,places,{x:130,y:240,width:820,height:530},{color:theme.dark?'#3f6574':theme.accent});
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
  fit(ctx,String(trip?.name||'ทริปของเรา'),920,100,42);ctx.fillText(ellipsis(ctx,trip?.name||'ทริปของเรา',920),80,1105);
  ctx.font='500 29px "Anuphan",sans-serif';ctx.fillText(ellipsis(ctx,storyDateLabel(trip,dateLabel),920),80,1170);
- drawRouteNames(ctx,places);
  ctx.font='700 26px Nunito,sans-serif';ctx.fillStyle='#f1f7fb';ctx.fillText(`Our Travel Crew · ${members.length}`,80,1362);
  const size=82,people=participantLayout(members.length,920,{avatarSize:size,defaultOverlap:20,minAvatarSize:49.2});
  members.forEach((member,index)=>{const s=people.avatarSize,left=80+index*people.step,top=1385+(size-s)/2,cx=left+s/2,cy=top+s/2,r=(s-5)/2;ctx.save();ctx.shadowBlur=0;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();ctx.fillStyle=theme.dark?'#3f6574':theme.accent;ctx.fillRect(left,top,s,s);if(avatars[index]){const image=avatars[index],rect=coverImageRect(image.naturalWidth,image.naturalHeight,s,s);ctx.drawImage(image,left+rect.x,top+rect.y,rect.width,rect.height);}else{ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`800 ${s*.4}px "Anuphan",sans-serif`;ctx.fillText(participantInitial(member.name),cx,cy);}ctx.restore();ctx.strokeStyle='#ffffffd9';ctx.lineWidth=5;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();});
