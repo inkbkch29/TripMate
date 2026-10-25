@@ -66,12 +66,12 @@ drop policy if exists "owners upload trip covers" on storage.objects;
 drop policy if exists "owners update trip covers" on storage.objects;
 drop policy if exists "owners delete trip covers" on storage.objects;
 create policy "owners upload trip covers" on storage.objects for insert to authenticated
-with check (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(name))[1] and t.owner_id=auth.uid()));
+with check (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(storage.objects.name))[1] and t.owner_id=auth.uid()));
 create policy "owners update trip covers" on storage.objects for update to authenticated
-using (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(name))[1] and t.owner_id=auth.uid()))
-with check (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(name))[1] and t.owner_id=auth.uid()));
+using (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(storage.objects.name))[1] and t.owner_id=auth.uid()))
+with check (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(storage.objects.name))[1] and t.owner_id=auth.uid()));
 create policy "owners delete trip covers" on storage.objects for delete to authenticated
-using (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(name))[1] and t.owner_id=auth.uid()));
+using (bucket_id='trip-covers' and exists(select 1 from public.trips t where t.id::text=(storage.foldername(storage.objects.name))[1] and t.owner_id=auth.uid()));
 
 create or replace function public.revoke_trip_invite(target_invite uuid)
 returns void language plpgsql security definer set search_path=public
