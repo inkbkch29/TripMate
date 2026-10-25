@@ -14,7 +14,7 @@ it('waits for profile photos and draws every member in order without exporting a
  const rendering=renderRecapStory({trip:{name:'QA'},members,places:[],total:0});await Promise.resolve();await Promise.resolve();expect(toBlob).not.toHaveBeenCalled();release(images);
  expect((await rendering).type).toBe('image/png');expect(context.drawImage).toHaveBeenCalledTimes(30);
  context.drawImage.mock.calls.forEach((call,index)=>expect(call[0]).toBe(images[index]));
- expect(context.fillText.mock.calls.some(([text])=>String(text).includes('30 คน'))).toBe(true);
+ expect(context.fillText.mock.calls.some(([text])=>String(text).includes('Our Travel Crew · 30'))).toBe(true);
  expect(context.fillText.mock.calls.some(([text])=>String(text).includes('Person'))).toBe(false);
  const last=context.drawImage.mock.calls.at(-1);expect(last[1]).toBeGreaterThan(context.drawImage.mock.calls[0][1]);
 });
