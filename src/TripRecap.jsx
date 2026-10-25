@@ -1,9 +1,10 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Alert,Avatar,AvatarGroup,Box,Button,Checkbox,CircularProgress,Dialog,DialogActions,DialogContent,DialogTitle,FormControlLabel,IconButton,Slider,Stack,Switch,TextField,Typography} from '@mui/material';
+import {Alert,Box,Button,Checkbox,CircularProgress,Dialog,DialogActions,DialogContent,DialogTitle,FormControlLabel,IconButton,Slider,Stack,Switch,TextField,Typography} from '@mui/material';
 import {CameraAltRounded,ChevronLeftRounded,CloseRounded,DownloadRounded,EditRounded,KeyboardArrowDownRounded,KeyboardArrowUpRounded,ShareRounded} from '@mui/icons-material';
 import {compressImage} from './image-utils';
 import {renderRecapStory,recapThemes} from './recap-story';
 import {tripLedger} from './trip-ledger';
+import ParticipantsAvatarGroup from './ParticipantsAvatarGroup';
 const money=v=>new Intl.NumberFormat('th-TH',{style:'currency',currency:'THB'}).format(v);
 export default function TripRecap({trip,members,stops,expenses,collections=[],traveled=0,dateLabel=''}){
  const total=tripLedger(expenses,collections,[],members.map(m=>m.id)).cost;
@@ -19,7 +20,7 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
   if(!open)return;let active=true;const id=++generation.current;setPreview(old=>({...old,busy:true}));
   const timer=setTimeout(()=>renderRecapStory({trip,dateLabel,members,places,total,traveled,themeId:theme,imageSrc,crop,showExpenses,showRoute}).then(blob=>{if(!active||id!==generation.current)return;const url=URL.createObjectURL(blob);setPreview(old=>({...old,url,blob,busy:false}));setError('');}).catch(err=>{if(active){setError(err.message);setPreview(old=>({...old,busy:false,blob:null,url:''}));}}),180);
   return()=>{active=false;clearTimeout(timer);};
- },[open,trip?.name,dateLabel,JSON.stringify(members.map(m=>m.name)),JSON.stringify(places.map(p=>[p.id,p.title])),total,traveled,theme,imageSrc,crop.zoom,crop.x,crop.y,showExpenses,showRoute]);
+ },[open,trip?.name,dateLabel,JSON.stringify(members.map(m=>[m.id,m.name,m.avatar])),JSON.stringify(places.map(p=>[p.id,p.title])),total,traveled,theme,imageSrc,crop.zoom,crop.x,crop.y,showExpenses,showRoute]);
  useEffect(()=>()=>{if(preview.url)URL.revokeObjectURL(preview.url);},[preview.url]);
  const upload=async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type))return setError('เลือกรูป JPG, PNG หรือ WebP');if(file.size>15*1024*1024)return setError('เลือกรูปไม่เกิน 15 MB');setUploading(true);setError('');try{const compressed=await compressImage(file,{maxWidth:2200,maxHeight:2200});setCustom(URL.createObjectURL(compressed));setSource('custom');setCrop({zoom:1,x:50,y:50});}catch{setError('อ่านรูปไม่ได้ กรุณาเลือกรูปใหม่');}finally{setUploading(false);}};
  const download=()=>{if(!preview.blob||preview.busy)return;const a=document.createElement('a');a.href=preview.url;a.download=`TripMate-${(trip?.name||'recap').replace(/[\\/:*?"<>|]/g,'-')}.png`;a.click();};
@@ -29,7 +30,7 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
  return <Stack spacing={2.5} className="trip-recap recap-redesign">
   <Box><Typography variant="overline">OUR LITTLE GETAWAY</Typography><Typography variant="h4">ความทรงจำของทริปนี้ ♡</Typography><Typography color="text.secondary">รูปเดียว เก็บช่วงเวลาดี ๆ ของเราไว้</Typography></Box>
   <Box className="recap-memory-cover"><img src={trip?.cover_url||'/assets/trip-hero-landscape-v4.webp'} alt={`รูปปกทริป ${trip?.name||''}`}/><Box><Typography variant="h4">{trip?.name||'ทริปของเรา'}</Typography><Typography>{dateLabel}</Typography></Box></Box>
-  <Stack direction="row" spacing={1.5} alignItems="center"><AvatarGroup max={5}>{members.map(m=><Avatar key={m.id} src={m.avatar} alt={m.name}>{m.name?.slice(0,1)}</Avatar>)}</AvatarGroup><Box minWidth={0}><Typography fontWeight={800}>ไปด้วยกัน {members.length} คน</Typography><Typography variant="body2" color="text.secondary">{members.map(m=>m.name).join(' · ')}</Typography></Box></Stack>
+  <ParticipantsAvatarGroup members={members}/>
   <Box className="recap-memory-facts"><span>{stops.length} สถานที่ในแพลน</span>{traveled>0&&<span>{(traveled/1000).toFixed(1)} กม. ที่บันทึก</span>}<span>ค่าใช้จ่ายรวม {money(total)}</span></Box>
   <Button variant="contained" size="large" startIcon={<EditRounded/>} onClick={()=>setOpen(true)}>แต่งรูป Recap ของเรา</Button><Typography variant="caption" color="text.secondary">เลือกรูป จัดตำแหน่ง และซ่อนยอดเงินก่อนแชร์ได้</Typography>
   {trip?.google_photos_url&&<Button variant="text" startIcon={<CameraAltRounded/>} href={trip.google_photos_url} target="_blank" rel="noopener noreferrer">เปิดอัลบั้มรูปของทริป</Button>}

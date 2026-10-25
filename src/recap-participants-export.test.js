@@ -1,0 +1,20 @@
+import {afterEach,it,expect,vi} from 'vitest';
+import {renderRecapStory} from './recap-story';
+const {photos}=vi.hoisted(()=>({photos:vi.fn()}));
+vi.mock('./participant-images',()=>({loadParticipantImages:photos}));
+afterEach(()=>vi.restoreAllMocks());
+it('waits for profile photos and draws every member in order without exporting a name list',async()=>{
+ const context={measureText:text=>({width:String(text).length*14}),createLinearGradient:()=>({addColorStop:vi.fn()})};
+ for(const method of ['fillRect','beginPath','arc','fill','rect','clip','drawImage','save','restore','fillText','roundRect','stroke','moveTo','lineTo'])context[method]=vi.fn();
+ vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(context);
+ const toBlob=vi.spyOn(HTMLCanvasElement.prototype,'toBlob').mockImplementation(callback=>callback(new Blob(['png'],{type:'image/png'})));
+ const members=Array.from({length:30},(_,i)=>({id:String(i),name:`Person ${i+1}`,avatar:`photo-${i}`}));
+ const images=members.map((member,index)=>({naturalWidth:100,naturalHeight:80,index}));
+ let release;photos.mockImplementation(()=>new Promise(resolve=>{release=resolve;}));
+ const rendering=renderRecapStory({trip:{name:'QA'},members,places:[],total:0});await Promise.resolve();await Promise.resolve();expect(toBlob).not.toHaveBeenCalled();release(images);
+ expect((await rendering).type).toBe('image/png');expect(context.drawImage).toHaveBeenCalledTimes(30);
+ context.drawImage.mock.calls.forEach((call,index)=>expect(call[0]).toBe(images[index]));
+ expect(context.fillText.mock.calls.some(([text])=>String(text).includes('30 คน'))).toBe(true);
+ expect(context.fillText.mock.calls.some(([text])=>String(text).includes('Person'))).toBe(false);
+ const last=context.drawImage.mock.calls.at(-1);expect(last[1]).toBeGreaterThan(context.drawImage.mock.calls[0][1]);
+});
