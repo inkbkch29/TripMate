@@ -1,3 +1,4 @@
+import {mapStop} from './trip-mode';
 import {supabase} from './supabase';
 import {compressImage} from './image-utils';
 import {tripFilePath} from './trip-utils';
@@ -21,6 +22,8 @@ async function prepareOptions(options,tripId,userId,uploaded){
 }
 async function withPhotos(options,tripId,userId,save){const uploaded=[];try{return await save(await prepareOptions(options,tripId,userId,uploaded));}catch(error){if(uploaded.length)await supabase.storage.from('trip-files').remove(uploaded).catch(()=>{});throw error;}}
 export const pollApi={
+ async addToPlan(poll,option,form,allowAnotherDay,requestId){const result=await rpc('poll_option_to_plan',{poll_token:poll.token,source_option:option.id,plan_data:{...form,round:poll.round},allow_another_day:allowAnotherDay,request_key:requestId});return {...result,stop:mapStop(result.stop)};},
+ async stopMedia(stop){return (await hydrate({options:[{images:stop.images||[],image_url:stop.sourceSnapshot?.image_url}]})).options[0].media;},
  async list(tripId){return await rpc('trip_poll_list',{target_trip:tripId})||[];},
  async snapshot(token,round=null){return hydrate(await rpc('trip_poll_snapshot',{poll_token:token,requested_round:round}));},
  async save(tripId,userId,draft){return withPhotos(draft.options,tripId,userId,options=>rpc('trip_poll_save',{target_trip:tripId,poll_token:draft.token||null,poll_title:draft.title,poll_settings:draft.settings,poll_options:options,target_status:draft.status,expected_revision:draft.revision??null}));},

@@ -20,3 +20,7 @@ it('renews legacy signed URLs, preserves public legacy images and safely skips m
 it('passes ballot choices and option revisions to the protected RPCs',async()=>{
  await pollApi.vote('t',['a','b']);expect(mock.rpc).toHaveBeenLastCalledWith('trip_poll_vote',{poll_token:'t',option_ids:['a','b']});await pollApi.option({token:'t',trip_id:'trip',revision:5},'user',{id:'a',name:'A'});expect(mock.rpc.mock.calls[1][1].option_data.expected_revision).toBe(5);
 });
+it('adds a source option in one atomic RPC and maps the persisted stop metadata',async()=>{
+ mock.rpc.mockResolvedValue({data:{already_exists:false,stop:{id:'stop',trip_id:'trip',day_number:2,start_time:'10:30:00',title:'เข้าที่พัก',source_poll_id:'p',source_poll_option_id:'o',source_poll_token:'t',price:1200,images:['image'],links:['https://example.com']}}});
+ const result=await pollApi.addToPlan({token:'t',round:1},{id:'o'},{day:2,time:'10:30'},true,'request');expect(mock.rpc).toHaveBeenCalledWith('poll_option_to_plan',{poll_token:'t',source_option:'o',plan_data:{day:2,time:'10:30',round:1},allow_another_day:true,request_key:'request'});expect(result.stop).toMatchObject({id:'stop',tripId:'trip',day:2,time:'10:30',sourcePollId:'p',sourcePollOptionId:'o',images:['image'],price:1200});
+});

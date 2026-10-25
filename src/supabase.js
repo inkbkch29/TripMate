@@ -1,3 +1,4 @@
+import {mapStop} from "./trip-mode";
 import { splitAmount } from "./finance";
 import { createClient } from "@supabase/supabase-js";
 import { tripFilePath } from "./trip-utils";
@@ -132,7 +133,7 @@ export async function loadTripData(tripId) {
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
     supabase.from("collections").select("*, collection_payments(user_id,amount,status,slip_url,submitted_by,received_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
-    supabase.from("live_locations").select("*").eq("trip_id",tripId).eq("sharing_enabled",true),
+    supabase.rpc("trip_live_locations",{target_trip:tripId}),
     supabase.from("trip_settlements").select("*").eq("trip_id",tripId),
     supabase.from("trip_stop_checkins").select("*, trip_stops!inner(trip_id)").eq("trip_stops.trip_id",tripId),
     supabase.from("trip_location_history").select("user_id,latitude,longitude,recorded_at").eq("trip_id",tripId).order("recorded_at"),
@@ -160,7 +161,7 @@ export async function loadTripData(tripId) {
   });
   return {
     members,
-    stops: stopResult.data.map((s) => ({ id: s.id, day: s.day_number, time: s.start_time?.slice(0,5) || "", title: s.title, place: s.place_name, note: s.note || "", latitude:s.latitude, longitude:s.longitude, googleMapsUrl:s.google_maps_url||"", sortOrder:s.sort_order, done: s.is_done, revision:s.revision||1, updatedAt:s.updated_at })),
+    stops: stopResult.data.map(mapStop),
     expenses: expenseResult.data.map((e) => {
       const receiptUrl = signedByPath[e.receipt_path]||"";
       return { id: e.id, title: e.title, amount: Number(e.amount), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptBreakdown:e.receipt_breakdown||null, receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
@@ -264,13 +265,14 @@ export async function cleanupTripLocations(tripId){
 }
 
 export async function loadLiveLocations(tripId){
-  const {data,error}=await supabase.from("live_locations").select("*").eq("trip_id",tripId).eq("sharing_enabled",true);
+  const {data,error}=await supabase.rpc("trip_live_locations",{target_trip:tripId});
   if(error)throw error;
   return data||[];
 }
 
 export async function saveStop(tripId, userId, stop) {
-  const row={ id: stop.id, trip_id: tripId, day_number: stop.day, start_time: stop.time || null, title: stop.title, place_name: stop.place, latitude:stop.latitude||null, longitude:stop.longitude||null, google_maps_url:stop.googleMapsUrl||null, note: stop.note || null, is_done: stop.done, sort_order: stop.sortOrder ?? stop.day * 1000, created_by: userId };
+  const row={ id: stop.id, trip_id: tripId, day_number: stop.day, start_time: stop.time || null, title: stop.title, place_name: stop.place, latitude:stop.latitude??null, longitude:stop.longitude??null, google_maps_url:stop.googleMapsUrl||null, note: stop.note || null, is_done: stop.done, sort_order: stop.sortOrder ?? stop.day * 1000, created_by: userId };
+  if(stop.price!==undefined)row.price=stop.price===""?null:stop.price;if(stop.links!==undefined)row.links=stop.links;if(stop.images!==undefined)row.images=stop.images;
   const query=stop.revision
     ?supabase.from("trip_stops").update(row).eq("id",stop.id).eq("trip_id",tripId).eq("revision",stop.revision).select("revision,updated_at").maybeSingle()
     :supabase.from("trip_stops").insert(row).select("revision,updated_at").single();
