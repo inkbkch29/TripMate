@@ -1,6 +1,6 @@
 export function travelStatsItems({places=0,total=0,showExpenses=true}){
- const items=[{id:'places',value:String(places),label:'สถานที่ในทริป'}];
- if(showExpenses)items.push({id:'expenses',value:`฿${new Intl.NumberFormat('th-TH',{maximumFractionDigits:2}).format(total)}`,label:'ค่าใช้จ่ายรวม'});
+ const items=[{id:'places',value:String(places),label:places===1?'Place Visited':'Places Visited'}];
+ if(showExpenses)items.push({id:'expenses',value:`฿${new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(total)}`,label:'Total Spent'});
  return items;
 }
 export function drawTravelStats(ctx,options,icons){

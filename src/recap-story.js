@@ -1,3 +1,5 @@
+import {storyDateLabel,storyTripTitle,storyPlaceTitle} from './recap-text';
+export {storyDateLabel} from './recap-text';
 import {normalizeHex} from './recap-color';
 import {loadTravelStatIcons} from './recap-stat-icons';
 import {drawTravelStats} from './travel-stats';
@@ -14,11 +16,7 @@ const coverImages=new Map();
 export function loadRecapImage(src){if(coverImages.has(src))return coverImages.get(src);const pending=new Promise((resolve,reject)=>{if(!src)return resolve(null);const image=new Image();image.crossOrigin='anonymous';image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('เปิดรูปพื้นหลังไม่ได้ กรุณาเลือกรูปใหม่หรือใช้พื้นหลังสี'));image.src=src;}).catch(error=>{coverImages.delete(src);throw error;});if(src){coverImages.set(src,pending);if(coverImages.size>3)coverImages.delete(coverImages.keys().next().value);}return pending;}
 function fit(ctx,text,maxWidth,size,min=20){while(size>min){ctx.font=`700 ${size}px "Anuphan",sans-serif`;if(ctx.measureText(text).width<=maxWidth)break;size-=2;}return size;}
 function ellipsis(ctx,text,maxWidth){let value=String(text||'');if(ctx.measureText(value).width<=maxWidth)return value;while(value.length&&ctx.measureText(value+'…').width>maxWidth)value=value.slice(0,-1);return value+'…';}
-export function storyDateLabel(trip,dateLabel=''){
- const start=Date.parse(`${trip?.start_date}T00:00:00Z`),end=Date.parse(`${trip?.end_date}T00:00:00Z`),days=Math.round((end-start)/86400000)+1;
- return dateLabel&&!dateLabel.includes('วัน')&&Number.isFinite(days)&&days>0?`${dateLabel} · ${days} วัน`:dateLabel;
-}
-export async function renderRecapStory({trip,dateLabel,members=[],places=[],total=0,themeId='minimal',imageSrc='',crop={},showExpenses=true,showRoute=true,avatarColor=null,fileType='image/png'}){
+export async function renderRecapStory({trip,dateLabel,coverTitle,members=[],places=[],total=0,themeId='minimal',imageSrc='',crop={},showExpenses=true,showRoute=true,avatarColor=null,fileType='image/png'}){
  await document.fonts?.ready;
  const [photo,avatars,icons]=await Promise.all([loadRecapImage(imageSrc),loadParticipantImages(members),loadTravelStatIcons()]);
  const height=1920,theme=recapThemes[themeId]||recapThemes.minimal,color=normalizeHex(avatarColor)||(theme.dark?'#3f6574':theme.accent);
@@ -28,10 +26,11 @@ export async function renderRecapStory({trip,dateLabel,members=[],places=[],tota
  const shade=ctx.createLinearGradient(0,0,0,height);shade.addColorStop(0,'rgba(15,31,40,.16)');shade.addColorStop(.3,'rgba(15,31,40,0)');shade.addColorStop(.5,'rgba(15,31,40,.22)');shade.addColorStop(.68,'rgba(15,31,40,.66)');shade.addColorStop(1,'rgba(10,25,32,.88)');ctx.fillStyle=shade;ctx.fillRect(0,0,1080,height);
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.shadowColor='rgba(9,24,32,.38)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
  ctx.font='800 25px Nunito,sans-serif';ctx.fillText('TRIPMATE / THE MEMORY EDIT',80,250);
- if(showRoute&&places.length){ctx.font='500 22px \"Anuphan\",sans-serif';ctx.fillStyle='#ffffffdf';ctx.fillText(ellipsis(ctx,places.map((place,index)=>`${index+1} · ${place.title||place.place||'สถานที่'}`).join('  →  '),920),80,304);}
- if(showRoute)drawNumberedRoute(ctx,places,{x:130,y:360,width:820,height:430},{color});
+ const coverPlaces=places.map(place=>({...place,title:storyPlaceTitle(place)}));
+ if(showRoute&&places.length){ctx.font='500 22px \"Anuphan\",sans-serif';ctx.fillStyle='#ffffffdf';ctx.fillText(ellipsis(ctx,coverPlaces.map((place,index)=>`${index+1} · ${place.title}`).join('  →  '),920),80,304);}
+ if(showRoute)drawNumberedRoute(ctx,coverPlaces,{x:130,y:360,width:820,height:430},{color});
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
- fit(ctx,String(trip?.name||'ทริปของเรา'),920,100,42);ctx.fillText(ellipsis(ctx,trip?.name||'ทริปของเรา',920),80,1040);
+ const title=coverTitle?.trim()||storyTripTitle(trip);fit(ctx,title,920,100,42);ctx.fillText(ellipsis(ctx,title,920),80,1040);
  ctx.font='500 29px "Anuphan",sans-serif';ctx.fillText(ellipsis(ctx,storyDateLabel(trip,dateLabel),920),80,1100);
  ctx.font='700 26px Nunito,sans-serif';ctx.fillStyle='#f1f7fb';ctx.fillText(`Our Travel Crew · ${members.length}`,80,1195);
  const size=82,people=participantLayout(members.length,920,{avatarSize:size,defaultOverlap:20,minAvatarSize:49.2});
