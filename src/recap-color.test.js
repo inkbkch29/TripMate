@@ -1,0 +1,6 @@
+import {it,expect,afterEach} from 'vitest';
+import {normalizeHex,hexToHsv,hsvToHex,loadRecapConfiguration,saveRecapColor,DEFAULT_AVATAR_COLOR} from './recap-color';
+afterEach(()=>localStorage.clear());
+it('validates HEX input and rejects non-color strings',()=>{expect(normalizeHex('#a1b2c3')).toBe('#A1B2C3');expect(normalizeHex('#abc')).toBe('#AABBCC');expect(normalizeHex('ff0099')).toBe('#FF0099');expect(normalizeHex('url(x)')).toBe(null);expect(normalizeHex('#GG0000')).toBe(null);});
+it('roundtrips wheel colors and handles black, white and saturation limits',()=>{for(const color of ['#000000','#FFFFFF','#FF0000','#3786AD','#BBAACC'])expect(hsvToHex(hexToHsv(color))).toBe(color);expect(hsvToHex({h:720,s:2,v:2})).toBe('#FF0000');});
+it('persists validated recap color separately for each trip',()=>{saveRecapColor('trip-a','#123abc');expect(loadRecapConfiguration('trip-a').avatarColor).toBe('#123ABC');expect(loadRecapConfiguration('trip-b').avatarColor).toBe(DEFAULT_AVATAR_COLOR);saveRecapColor('trip-a','bad input');expect(loadRecapConfiguration('trip-a').avatarColor).toBe('#123ABC');localStorage.setItem('tripmate:recap:config:trip-a','broken');expect(loadRecapConfiguration('trip-a').avatarColor).toBe(DEFAULT_AVATAR_COLOR);});

@@ -2,6 +2,7 @@ import {afterEach,it,expect,vi} from 'vitest';
 import {renderRecapStory} from './recap-story';
 const {photos}=vi.hoisted(()=>({photos:vi.fn()}));
 vi.mock('./participant-images',()=>({loadParticipantImages:photos}));
+vi.mock('./recap-stat-icons',()=>({loadTravelStatIcons:async()=>({places:{stat:'places'},expenses:{stat:'expenses'}})}));
 afterEach(()=>vi.restoreAllMocks());
 it('waits for profile photos and draws every member in order without exporting a name list',async()=>{
  const context={measureText:text=>({width:String(text).length*14}),createLinearGradient:()=>({addColorStop:vi.fn()})};
@@ -12,9 +13,9 @@ it('waits for profile photos and draws every member in order without exporting a
  const images=members.map((member,index)=>({naturalWidth:100,naturalHeight:80,index}));
  let release;photos.mockImplementation(()=>new Promise(resolve=>{release=resolve;}));
  const rendering=renderRecapStory({trip:{name:'QA'},members,places:[],total:0});await Promise.resolve();await Promise.resolve();expect(toBlob).not.toHaveBeenCalled();release(images);
- expect((await rendering).type).toBe('image/png');expect(context.drawImage).toHaveBeenCalledTimes(30);
- context.drawImage.mock.calls.forEach((call,index)=>expect(call[0]).toBe(images[index]));
+ expect((await rendering).type).toBe('image/png');expect(context.drawImage).toHaveBeenCalledTimes(32);
+ const avatarCalls=context.drawImage.mock.calls.filter(call=>images.includes(call[0]));avatarCalls.forEach((call,index)=>expect(call[0]).toBe(images[index]));
  expect(context.fillText.mock.calls.some(([text])=>String(text).includes('Our Travel Crew · 30'))).toBe(true);
  expect(context.fillText.mock.calls.some(([text])=>String(text).includes('Person'))).toBe(false);
- const last=context.drawImage.mock.calls.at(-1);expect(last[1]).toBeGreaterThan(context.drawImage.mock.calls[0][1]);
+ const last=avatarCalls.at(-1);expect(last[1]).toBeGreaterThan(context.drawImage.mock.calls[0][1]);
 });
