@@ -1,0 +1,5 @@
+import React from 'react';
+import {Dialog,DialogTitle,DialogContent,DialogActions,Typography,Button} from '@mui/material';
+export default function FinanceDeleteDialog({request,busy,recoverable,onClose,onConfirm}){
+ return <Dialog open={Boolean(request)} onClose={()=>{if(!busy)onClose();}} fullWidth maxWidth="xs" aria-labelledby="finance-delete-title"><DialogTitle id="finance-delete-title">{recoverable?'ย้ายรายการไปถังขยะ?':'ลบรายการตัวอย่าง?'}</DialogTitle><DialogContent><Typography fontWeight={800}>{request?.item.title}</Typography><Typography mt={1} color="text.secondary">{recoverable?'กู้คืนรายการ สถานะการจ่าย และไฟล์แนบได้ภายใน 7 วัน ที่ตั้งค่า › ทริปและแอป › ประวัติและกู้คืนข้อมูล':'เรียกข้อมูลตัวอย่างกลับมาได้ด้วยปุ่มรีเซ็ต'}</Typography>{request?.item.expenseId&&<Typography mt={1} variant="body2">บิลอาหารและรายการเรียกเก็บที่เชื่อมกันจะถูกย้ายไปด้วยกัน</Typography>}</DialogContent><DialogActions><Button disabled={busy} onClick={onClose}>ยกเลิก</Button><Button disabled={busy} color="error" variant="contained" onClick={onConfirm}>{busy?'กำลังย้าย…':recoverable?'ย้ายไปถังขยะ':'ลบรายการตัวอย่าง'}</Button></DialogActions></Dialog>;
+}

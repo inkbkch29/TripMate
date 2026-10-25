@@ -45,8 +45,9 @@ export function parseReceiptText(text) {
     if (!match) continue;
     const name = match[1].trim(); const amount = Number(match[2].replaceAll(',', ''));
     if (!/[a-zA-Zก-๙]/.test(name) || !Number.isFinite(amount) || amount <= 0) continue;
+    if (/tax\s*id|เลขประจำตัว|เลขที่ใบ|ใบเสร็จ|receipt|invoice|โทร|tel|วันที่|date|time|table|โต๊ะ|cash|change|เงินสด|เงินทอน|รับเงิน/i.test(name)) continue;
     if (/subtotal|sub total|รวมรายการ|รวมเป็นเงิน|ยอดก่อน/i.test(name)) continue;
-    if (/grand\s*total|net\s*total|ยอดสุทธิ|รวมสุทธิ|ยอดชำระ|^total\b|ยอดรวม|รวมทั้งสิ้น/i.test(name)) { result.expectedTotal = amount; continue; }
+    if (/grand\s*total|net\s*total|ยอดสุทธิ|รวมสุทธิ|ยอดชำระ|^total\b|ยอดรวม|รวมทั้งสิ้น|^รวม(?:เงิน)?$/i.test(name)) { result.expectedTotal = amount; continue; }
     if (/service|ค่าบริการ/i.test(name)) { result.serviceCharge = amount; continue; }
     if (/vat|tax|ภาษี/i.test(name)) { result.tax = amount; continue; }
     if (/discount|ส่วนลด/i.test(name)) { result.discount = amount; continue; }
@@ -88,4 +89,13 @@ export function roundReceiptShares(shares) {
   cost+=amount;charged+=rounded;
  }
  return {chargedShares,fundShares,originalTotal:cost/100,chargedTotal:charged/100,fundRemainder:(charged-cost)/100};
+}
+
+// Let people correct an OCR line classified as food without typing its amount twice.
+export function moveReceiptItemToExtra(receipt,itemId,field){
+ if(!['serviceCharge','tax','discount'].includes(field))throw new Error('Invalid receipt extra');
+ const item=receipt.items.find(row=>row.id===itemId);
+ const amount=cents(item?.amount),existing=cents(receipt[field]);
+ if(!item||!Number.isSafeInteger(amount)||amount<=0||!Number.isSafeInteger(existing)||existing<0)throw new Error('ตรวจราคาของรายการก่อนย้าย');
+ return {...receipt,items:receipt.items.filter(row=>row.id!==itemId),[field]:(existing+amount)/100,reviewed:false};
 }

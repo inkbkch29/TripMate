@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, MenuItem, IconButton, LinearProgress, Stack, TextField, Typography } from '@mui/material';
 import { AddRounded, CameraAltRounded, DeleteOutlineRounded, ContentCopyRounded } from '@mui/icons-material';
-import { cents, parseReceiptText, splitReceipt, receiptProgress, receiptItemCategory } from './receipt-split';
+import { cents, parseReceiptText, splitReceipt, receiptProgress, receiptItemCategory, moveReceiptItemToExtra } from './receipt-split';
 import { splitAmount } from './finance';
 import { readReceipt } from './receipt-ocr';
 
@@ -51,7 +51,7 @@ export default function ReceiptSplitEditor({ value, onChange, members, receiptFi
     {(preview||receiptUrl)&&<img className="receipt-photo" src={preview||receiptUrl} alt="ใบเสร็จสำหรับตรวจราคา"/>}
     {reading&&<Box role="status"><LinearProgress variant={progress?.status==='recognizing text'?'determinate':'indeterminate'} value={(progress?.progress||0)*100}/><Typography variant="caption">กำลังอ่านใบเสร็จ… ครั้งแรกอาจใช้เวลาสักครู่</Typography><Button size="small" onClick={()=>{operation.current?.abort();setError('ยกเลิกการอ่านแล้ว เพิ่มรายการเองได้');}}>ยกเลิกการอ่าน</Button></Box>}
     {error&&<Alert severity="warning">{error}</Alert>}
-    {rawText&&<Alert severity="info">อ่านรายการแล้ว กรุณาตรวจชื่อ ราคา และยอดสุทธิให้ตรงใบเสร็จก่อนเลือกคน</Alert>}
+    {rawText&&<Alert severity="info">อ่านรายการแล้ว กรุณาตรวจชื่อ ราคา และยอดสุทธิให้ตรงใบเสร็จก่อนเลือกคน หากค่าบริการ ภาษี หรือส่วนลดถูกอ่านเป็นอาหาร ให้เปลี่ยนหมวดของรายการนั้นเพื่อย้ายไปยอดรวม</Alert>}
     <Box className="receipt-progress" aria-live="polite"><Box><Typography variant="caption">ยอดรายการที่กรอก</Typography><Typography variant="h6">{money(progressTotals.subtotal)}</Typography></Box><Box><Typography variant="caption">ยอดที่จัดสรรแล้ว</Typography><Typography variant="h6">{money(progressTotals.allocated)}</Typography></Box></Box>
     <fieldset disabled={disabled||reading} className="receipt-fieldset"><Stack spacing={1.5}>
       <Typography fontWeight={800}>ติ๊กว่าใครกินอะไรบ้าง · {members.length} คน</Typography>
@@ -60,7 +60,7 @@ export default function ReceiptSplitEditor({ value, onChange, members, receiptFi
       {visibleItems.map(({item,index})=><Box key={item.id} className="receipt-item">
         <Stack direction="row" alignItems="center" justifyContent="space-between"><Typography variant="caption" color="text.secondary">รายการที่ {index+1}</Typography><IconButton size="small" aria-label={`ลบรายการอาหารที่ ${index+1}`} onClick={()=>change({items:value.items.filter(row=>row.id!==item.id)})}><DeleteOutlineRounded fontSize="small"/></IconButton></Stack>
         <Box className="receipt-item-inputs"><TextField size="small" label={`ชื่อรายการที่ ${index+1}`} value={item.name} onChange={event=>update(item.id,{name:event.target.value})}/><TextField size="small" label={`ราคารวมรายการที่ ${index+1}`} type="number" inputProps={{min:0,step:'0.01',inputMode:'decimal'}} value={item.amount} onChange={event=>update(item.id,{amount:event.target.value})}/></Box>
-        <TextField disabled={reading||disabled} select size="small" label={`หมวดรายการที่ ${index+1}`} value={item.category||receiptItemCategory(item.name)} onChange={event=>update(item.id,{category:event.target.value})} sx={{mt:1}}>{Object.entries(categories).filter(([key])=>key!=='all').map(([key,label])=><MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
+        <TextField disabled={reading||disabled} select size="small" label={`หมวดรายการที่ ${index+1}`} value={item.category||receiptItemCategory(item.name)} onChange={event=>{const category=event.target.value;if(["serviceCharge","tax","discount"].includes(category)){try{onChange(moveReceiptItemToExtra(value,item.id,category));setCopied(false);setError("");}catch(err){setError(err.message);}}else update(item.id,{category});}} sx={{mt:1}}>{Object.entries(categories).filter(([key])=>key!=='all').map(([key,label])=><MenuItem key={key} value={key}>{label}</MenuItem>)}<MenuItem value="serviceCharge">ค่าบริการ · ย้ายไปยอดรวม</MenuItem><MenuItem value="tax">ภาษีเพิ่ม · ย้ายไปยอดรวม</MenuItem><MenuItem value="discount">ส่วนลด · ย้ายไปยอดรวม</MenuItem></TextField>
         <Stack direction="row" alignItems="center" justifyContent="space-between" mt={.5}><Typography variant="caption" color="text.secondary">{item.participants.length?`${item.participants.length} คนร่วมจ่าย`:'ยังไม่เลือกคน'}</Typography><Stack direction="row"><Button size="small" onClick={()=>update(item.id,{participants:memberIds})}>เลือกทั้ง {members.length} คน</Button><Button size="small" onClick={()=>update(item.id,{participants:[]})}>ล้าง</Button></Stack></Stack>
         <Box className="receipt-people">{members.map(member=><FormControlLabel key={member.id} control={<Checkbox size="small" checked={item.participants.includes(member.id)} onChange={event=>update(item.id,{participants:event.target.checked?[...item.participants,member.id]:item.participants.filter(id=>id!==member.id)})}/>} label={member.name}/>)}</Box>
         {item.participants.length>0&&Number(item.amount)>0&&<Typography variant="caption" color="primary.dark">ประมาณ {money(Number(item.amount)/item.participants.length)} / คน · ยอดจริงจัดเศษสตางค์ให้รวมตรงบิล</Typography>}

@@ -1,3 +1,4 @@
+import {moveReceiptItemToExtra} from "./receipt-split";
 import {describe,it,expect} from 'vitest';
 import {splitReceipt,parseReceiptText} from './receipt-split';
 import {calculateBalances,expenseShares} from './finance';
@@ -60,4 +61,22 @@ describe('rounded food charges',()=>{
   const {receiptProgress}=await import('./receipt-split');
   const result=receiptProgress({roundUp:true,items:[{name:'A',amount:100,participants:['a']}]},['a','b']);expect(result.shares).toEqual({a:100});expect(result.fundRemainder).toBe(0);
  });
+});
+
+describe('Thai receipt headers and totals',()=>{
+ it('ignores tax identifiers before interpreting tax amounts',()=>{
+ const result=parseReceiptText('TAX ID 0123456789012\nเลขประจำตัวผู้เสียภาษี 0123456789012\nข้าวผัด 100.00\nชาเย็น 50.00\nค่าบริการ 15.00\nภาษี 11.55\nส่วนลด 5.00\nรวม 171.55');
+ expect(result.items.map(i=>i.name)).toEqual(['ข้าวผัด','ชาเย็น']);
+ expect(result.tax).toBe(11.55);expect(result.expectedTotal).toBe(171.55);
+ });
+});
+
+describe('correct misclassified OCR lines',()=>{
+ it('moves an extra out of food and preserves the amount exactly once',()=>{
+ const original={items:[{id:'food',name:'ข้าว',amount:100,participants:['a']},{id:'fee',name:'คอาบรธิการ',amount:15,participants:[]}],serviceCharge:5,reviewed:true};
+ const corrected=moveReceiptItemToExtra(original,'fee','serviceCharge');
+ expect(corrected.items).toHaveLength(1);expect(corrected.serviceCharge).toBe(20);expect(corrected.reviewed).toBe(false);
+ expect(splitReceipt(corrected,['a']).total).toBe(120);expect(original.items).toHaveLength(2);
+ });
+ it('rejects invalid prices without removing the line',()=>{expect(()=>moveReceiptItemToExtra({items:[{id:'bad',amount:'bad'}]},'bad','discount')).toThrow();});
 });
