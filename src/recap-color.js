@@ -1,5 +1,5 @@
 export const DEFAULT_AVATAR_COLOR='#877B62';
-export const AVATAR_COLORS=['#328B76','#3786AD','#6387A7','#877B62','#BB7467','#C97692','#916FAA','#6D80C4','#B38D42','#557C55','#3F6574','#555D70'];
+export const AVATAR_COLORS=['#328C7B','#388DB1','#BD776B','#877B62'];
 export function normalizeHex(value){let hex=String(value||'').trim();if(/^[\da-f]{6}$/i.test(hex))hex='#'+hex;if(/^#[\da-f]{6}$/i.test(hex))return hex.toUpperCase();if(/^#[\da-f]{3}$/i.test(hex))return '#'+hex.slice(1).split('').map(c=>c+c).join('').toUpperCase();return null;}
 export function hexToHsv(hex){const value=normalizeHex(hex)||DEFAULT_AVATAR_COLOR,rgb=[1,3,5].map(i=>parseInt(value.slice(i,i+2),16)/255),[r,g,b]=rgb,max=Math.max(...rgb),min=Math.min(...rgb),d=max-min;let h=d===0?0:max===r?((g-b)/d)%6:max===g?(b-r)/d+2:(r-g)/d+4;return {h:(h*60+360)%360,s:max===0?0:d/max,v:max};}
 export function hsvToHex({h,s,v}){h=((h%360)+360)%360;s=Math.max(0,Math.min(1,s));v=Math.max(0,Math.min(1,v));const c=v*s,x=c*(1-Math.abs(h/60%2-1)),m=v-c;const rgb=h<60?[c,x,0]:h<120?[x,c,0]:h<180?[0,c,x]:h<240?[0,x,c]:h<300?[x,0,c]:[c,0,x];return '#'+rgb.map(n=>Math.round((n+m)*255).toString(16).padStart(2,'0')).join('').toUpperCase();}

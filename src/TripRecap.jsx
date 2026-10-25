@@ -2,7 +2,6 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Alert,Box,Button,Checkbox,CircularProgress,Dialog,DialogActions,DialogContent,DialogTitle,FormControlLabel,IconButton,Slider,Stack,Switch,TextField,Typography} from '@mui/material';
 import {CameraAltRounded,ChevronLeftRounded,CloseRounded,DownloadRounded,EditRounded,KeyboardArrowDownRounded,KeyboardArrowUpRounded,ShareRounded} from '@mui/icons-material';
 import {compressImage} from './image-utils';
-import {storyTripTitle} from './recap-text';
 import {renderRecapStory} from './recap-story';
 import {tripLedger} from './trip-ledger';
 import {orderRecapStops} from './recap-route';
@@ -17,8 +16,8 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
  const [open,setOpen]=useState(false),[avatarColor,setAvatarColor]=useState(()=>loadRecapConfiguration(trip?.id).avatarColor),[source,setSource]=useState('cover'),[custom,setCustom]=useState(''),[crop,setCrop]=useState({zoom:1,x:50,y:50}),[showExpenses,setShowExpenses]=useState(true),[showRoute,setShowRoute]=useState(true),[fileType,setFileType]=useState('image/png'),[editing,setEditing]=useState(false),[uploading,setUploading]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState({url:'',blob:null,busy:false});
  const generation=useRef(0);
  const [draft,setDraft]=useState([]);
- const [coverTitle,setCoverTitle]=useState(()=>storyTripTitle(trip));
- useEffect(()=>setCoverTitle(storyTripTitle(trip)),[trip?.id,trip?.name,trip?.english_name,trip?.name_en,trip?.nameEn]);
+ const [coverTitle,setCoverTitle]=useState(()=>trip?.name||'');
+ useEffect(()=>setCoverTitle(trip?.name||''),[trip?.id,trip?.name]);
  useEffect(()=>{setDraft(orderRecapStops(stops).map(p=>({...p,enabled:true,title:p.title||p.place||'สถานที่'})));setCustom('');setSource('cover');setCrop({zoom:1,x:50,y:50});setAvatarColor(loadRecapConfiguration(trip?.id).avatarColor);},[trip?.id]);
  useEffect(()=>{setDraft(old=>orderRecapStops(stops).map(p=>{const saved=old.find(d=>d.id===p.id);return {...p,enabled:saved?.enabled??true,title:saved?.title??p.title??p.place??'สถานที่'};}));},[JSON.stringify(stops.map(p=>[p.id,p.title,p.day,p.time,p.sortOrder,p.latitude,p.longitude,p.googleMapsUrl]))]);
  useEffect(()=>{return()=>{if(custom)URL.revokeObjectURL(custom);};},[custom]);
@@ -46,7 +45,7 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
   <Dialog open={open} onClose={close} fullWidth maxWidth="md" className="recap-editor-dialog" aria-labelledby="recap-editor-title"><DialogTitle id="recap-editor-title"><Stack direction="row" alignItems="center" gap={1}><IconButton onClick={close} aria-label="กลับจากแต่ง Recap"><ChevronLeftRounded/></IconButton><Typography component="span" fontWeight={850} flex={1}>แต่งความทรงจำของเรา</Typography><IconButton onClick={close} aria-label="ปิด Recap"><CloseRounded/></IconButton></Stack></DialogTitle>
    <DialogContent><Box className="recap-editor-grid"><RecapCoverPreview preview={preview} name={trip?.name} places={places.length} total={total} showExpenses={showExpenses}/>
     <Stack spacing={2} className="recap-editor-controls">{error&&<Alert severity="warning">{error}</Alert>}
-     <TextField label="ชื่อทริปภาษาอังกฤษบนรูป" value={coverTitle} onChange={e=>setCoverTitle(e.target.value)} inputProps={{maxLength:100}} helperText="ใช้เฉพาะบนรูป Recap ไม่เปลี่ยนชื่อทริปเดิม" size="small" fullWidth/>
+     <TextField label="ตั้งชื่อทริป" value={coverTitle} onChange={e=>setCoverTitle(e.target.value)} inputProps={{maxLength:100}} helperText="ใช้เฉพาะบนรูป Recap ไม่เปลี่ยนชื่อทริปเดิม" size="small" fullWidth/>
      <Box><Typography fontWeight={800} mb={1}>รูปพื้นหลัง</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Button variant={source==='cover'?'contained':'outlined'} onClick={()=>{setSource('cover');setCrop({zoom:1,x:50,y:50});}}>รูปปกทริป</Button><Button component="label" variant={source==='custom'?'contained':'outlined'} disabled={uploading} startIcon={<CameraAltRounded/>}>{uploading?'กำลังอ่านรูป…':'เลือกรูปของฉัน'}<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={upload}/></Button><Button variant={source==='color'?'contained':'text'} onClick={()=>setSource('color')}>ใช้พื้นหลังสี</Button></Stack><Typography variant="caption" color="text.secondary">รูปที่เลือกใช้เฉพาะ Recap นี้ ไม่เปลี่ยนรูปปกทริป</Typography></Box>
      {source!=='color'&&<Box component="details" className="recap-crop-controls"><Typography component="summary" variant="body2" fontWeight={800} sx={{cursor:'pointer'}}>จัดตำแหน่งรูป</Typography>{[['zoom','ซูมรูปพื้นหลัง',1,3,.05],['x','เลื่อนรูปซ้าย–ขวา',0,100,1],['y','เลื่อนรูปขึ้น–ลง',0,100,1]].map(([key,label,min,max,step])=><Box key={key}><Typography variant="caption" color="text.secondary">{label}</Typography><Slider aria-label={label} value={crop[key]} min={min} max={max} step={step} onChange={(_,value)=>setCrop(old=>({...old,[key]:value}))}/></Box>)}<Button size="small" onClick={()=>setCrop({zoom:1,x:50,y:50})}>คืนตำแหน่งรูป</Button></Box>}
      <AvatarColorPicker value={avatarColor} onChange={value=>{const color=normalizeHex(value);if(color){setAvatarColor(color);saveRecapColor(trip?.id,color);}}}/>

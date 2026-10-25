@@ -30,7 +30,7 @@ export async function renderRecapStory({trip,dateLabel,coverTitle,members=[],pla
  if(showRoute&&places.length){ctx.font='500 22px \"Anuphan\",sans-serif';ctx.fillStyle='#ffffffdf';ctx.fillText(ellipsis(ctx,coverPlaces.map((place,index)=>`${index+1} · ${place.title}`).join('  →  '),920),80,304);}
  if(showRoute)drawNumberedRoute(ctx,coverPlaces,{x:130,y:360,width:820,height:430},{color});
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
- const title=coverTitle?.trim()||storyTripTitle(trip);fit(ctx,title,920,100,42);ctx.fillText(ellipsis(ctx,title,920),80,1040);
+ const title=coverTitle===undefined?storyTripTitle(trip):(coverTitle.trim()||trip?.name||'Our Trip');fit(ctx,title,920,100,42);ctx.fillText(ellipsis(ctx,title,920),80,1040);
  ctx.font='500 29px "Anuphan",sans-serif';ctx.fillText(ellipsis(ctx,storyDateLabel(trip,dateLabel),920),80,1100);
  ctx.font='700 26px Nunito,sans-serif';ctx.fillStyle='#f1f7fb';ctx.fillText(`Our Travel Crew · ${members.length}`,80,1195);
  const size=82,people=participantLayout(members.length,920,{avatarSize:size,defaultOverlap:20,minAvatarSize:49.2});
