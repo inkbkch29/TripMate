@@ -31,10 +31,11 @@ export function collectionFundTotals(collection) {
 // Collection dues retain their recipient and payment record. Never use the
 // unallocated expense-settlement action to pay a collection a second time.
 export function tripLedger(expenses,collections,settlements,memberIds){
- const approved=expenses.filter(e=>!e.approvalStatus||e.approvalStatus==='approved');
- const eligibleCollections=collections.filter(c=>!c.expenseId||approved.some(e=>e.id===c.expenseId));
+ const sourceIds=new Set(collections.filter(c=>c.installmentId).map(c=>c.expenseId).filter(Boolean));
+ const approved=expenses.filter(e=>(!e.approvalStatus||e.approvalStatus==='approved')&&!sourceIds.has(e.id));
+ const eligibleCollections=collections.filter(c=>!c.expenseId||sourceIds.has(c.expenseId)||approved.some(e=>e.id===c.expenseId));
  const linkedIds=new Set(eligibleCollections.map(c=>c.expenseId).filter(Boolean));
- const expenseBalances=calculateBalances(approved.filter(e=>!linkedIds.has(e.id)),memberIds);
+ const expenseBalances=calculateBalances(approved.filter(e=>!linkedIds.has(e.id)&&!e.isInstallmentParent),memberIds);
  for(const payment of settlements.filter(p=>p.status==='confirmed')){
   if(!memberIds.includes(payment.from)||!memberIds.includes(payment.to))continue;
   expenseBalances[payment.from]+=Number(payment.amount);expenseBalances[payment.to]-=Number(payment.amount);
@@ -44,13 +45,13 @@ export function tripLedger(expenses,collections,settlements,memberIds){
  for(const collection of eligibleCollections){
   const participants=[...new Set(collection.participants||[])];
   const fundOnly=Boolean(collection.isFund);
-  if(!fundOnly&&!collection.expenseId)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
+  if(!fundOnly&&!collection.expenseId&&!collection.installmentId)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
   const funding=collectionFundTotals(collection);
   fundExpected+=cents(funding.expected);fundReceived+=cents(funding.received);
   participants.forEach(id=>{
    const amount=cents(collectionPaymentAmount(collection,id));
    const paid=collectionPaymentConfirmed(collection,id);
-   if(id!==collection.receiver&&!paid&&amount>0)dues.push({collectionId:collection.id,title:collection.title,from:id,to:collection.receiver,amount:amount/100,fund:fundOnly,status:collection.payments?.[id]?.status||'unpaid'});
+   if(id!==collection.receiver&&!paid&&!collection.payments?.[id]?.superseded&&amount>0)dues.push({collectionId:collection.id,title:collection.title,from:id,to:collection.receiver,amount:amount/100,fund:fundOnly,status:collection.payments?.[id]?.status||'unpaid'});
   });
  }
  const totals=Object.fromEntries(memberIds.map(id=>[id,{pay:0,receive:0,fundPay:0,fundReceive:0}]));
@@ -60,5 +61,5 @@ export function tripLedger(expenses,collections,settlements,memberIds){
   if(totals[debt.to])totals[debt.to][receive]+=cents(debt.amount);
  }
  for(const row of Object.values(totals))for(const key of Object.keys(row))row[key]/=100;
- return {approved,expenseBalances,expenseTransfers,dues,totals,cost:cost/100,fundExpected:fundExpected/100,fundReceived:fundReceived/100};
+ return {approved,costEntryCount:approved.length+eligibleCollections.filter(c=>!c.isFund&&!c.expenseId&&!c.installmentId).length,expenseBalances,expenseTransfers,dues,totals,cost:cost/100,fundExpected:fundExpected/100,fundReceived:fundReceived/100};
 }

@@ -14,6 +14,7 @@ export const splitAmount = (amount, participants) => {
 export const calculateBalances = (expenses, memberIds) => {
   const balance = Object.fromEntries(memberIds.map((id) => [id, 0]));
   expenses.forEach((expense) => {
+    if(expense.isInstallmentParent)return;
     const funded=Math.min(Math.round(Number(expense.amount)*100),Number(expense.fundPaidSatang||0));
     const amount = (Math.round(Number(expense.amount)*100)-funded)/100;
     if (!balance.hasOwnProperty(expense.paidBy) || !Number.isFinite(amount)) return;

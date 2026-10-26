@@ -128,19 +128,20 @@ async function signedTripFile(path) {
 }
 
 export async function loadTripData(tripId) {
-  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult, checklistResult] = await withTimeout(Promise.all([
+  const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult, checklistResult, installmentResult] = await withTimeout(Promise.all([
     supabase.from("trip_members").select("trip_role, profiles(*)").eq("trip_id", tripId),
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
-    supabase.from("collections").select("*, collection_payments(user_id,amount,status,slip_url,submitted_by,received_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
+    supabase.from("collections").select("*, collection_payments(user_id,amount,status,slip_url,submitted_by,received_amount,installment_superseded_at)").eq("trip_id", tripId).order("created_at", { ascending: false }),
     supabase.rpc("trip_live_locations",{target_trip:tripId}),
     supabase.from("trip_settlements").select("*").eq("trip_id",tripId),
     supabase.from("trip_stop_checkins").select("*, trip_stops!inner(trip_id)").eq("trip_stops.trip_id",tripId),
     supabase.from("trip_location_history").select("user_id,latitude,longitude,recorded_at").eq("trip_id",tripId).order("recorded_at"),
     supabase.from("trip_route_stats").select("user_id,distance_m").eq("trip_id",tripId),
     supabase.from("trip_checklist_items").select("*").eq("trip_id",tripId).order("created_at"),
+    supabase.rpc("installment_trip_snapshot",{target_trip:tripId}),
   ]),12000,"โหลดข้อมูลทริปช้าเกินไป กรุณาลองใหม่");
-  const failed = [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult].find((result) => result.error);
+  const failed = [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, installmentResult].find((result) => result.error);
   if (failed) throw failed.error;
   const filePaths=[
     ...memberResult.data.map(({profiles:p})=>p.payment_qr_path),
@@ -164,9 +165,9 @@ export async function loadTripData(tripId) {
     stops: stopResult.data.map(mapStop),
     expenses: expenseResult.data.map((e) => {
       const receiptUrl = signedByPath[e.receipt_path]||"";
-      return { id: e.id, title: e.title, amount: e.fund_only?Number(e.fund_paid_satang)/100:Number(e.amount), fundPaidSatang:Number(e.fund_paid_satang||0),fundOnly:Boolean(e.fund_only), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptBreakdown:e.receipt_breakdown||null, receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
+      return { id: e.id, title: e.title,isInstallmentParent:Boolean(e.is_installment_parent),installmentSource:collectionResult.data.some(c=>c.expense_id===e.id&&c.installment_id),installmentPlan:(installmentResult.data||[]).find(p=>p.expense_id===e.id)||null, amount: e.fund_only?Number(e.fund_paid_satang)/100:Number(e.amount), fundPaidSatang:Number(e.fund_paid_satang||0),fundOnly:Boolean(e.fund_only), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptBreakdown:e.receipt_breakdown||null, receiptPath: e.receipt_path || "", receiptUrl, createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
     }).filter(e=>!e.fundOnly||e.amount>0),
-    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title, createdAt:c.created_at, expenseId:c.expense_id||null, fundShares:c.fund_shares||null, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund),fundAccountLabel:c.fund_account_label||"", perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status, amount:Number(p.amount), receivedAmount:p.received_amount==null?null:Number(p.received_amount), submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
+    collections: collectionResult.data.map((c) => ({ id: c.id, title: c.title,installmentId:c.installment_id||null,installmentBillSatang:c.installment_bill_satang==null?null:Number(c.installment_bill_satang),installmentFundPaidSatang:Number((installmentResult.data||[]).flatMap(p=>p.receipts).find(p=>p.collection_id===c.id)?.fund_paid_satang||0), createdAt:c.created_at, expenseId:c.expense_id||null, fundShares:c.fund_shares||null, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund),fundAccountLabel:c.fund_account_label||"", perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status,superseded:Boolean(p.installment_superseded_at),cashReceivedSatang:(installmentResult.data||[]).flatMap(plan=>plan.receipts).find(row=>row.collection_id===c.id&&row.user_id===p.user_id)?.cash_satang??null, amount:Number(p.amount), receivedAmount:p.received_amount==null?null:Number(p.received_amount), submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
     settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),

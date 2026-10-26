@@ -1,0 +1,3 @@
+import {supabase} from './supabase';
+export async function installmentAction(tripId,action,payload,requestId){const{data,error}=await supabase.rpc('installment_expense_action',{target_trip:tripId,action,payload,request_id:requestId});if(error)throw error;return data;}
+export async function installmentPreview(parentId,number,additions,unit,remainderMember,mode='balanced'){const{data,error}=await supabase.rpc('installment_expense_preview',{parent_id:parentId,target_number:number,additions,rounding_unit:unit,remainder_member:remainderMember||null,rounding_mode:mode});if(error)throw error;return data;}
