@@ -3,7 +3,7 @@
 // itself did not otherwise change.
 const BUILD_ID="__TRIPMATE_BUILD_ID__";
 const CACHE=`tripmate-brand-20261027-${BUILD_ID}`;
-const APP_SHELL=["/","/manifest.webmanifest","/app-icon-192.png","/app-icon-512.png","/apple-touch-icon.png","/app-icon.svg?v=20261027","/brand/tripmate-mark.svg?v=20261027","/app-icon-192.png?v=20261027","/app-icon-512.png?v=20261027","/apple-touch-icon.png?v=20261027"];
+const APP_SHELL=["/","/manifest.webmanifest","/manifest.webmanifest?v=20261027","/favicon-32.png?v=20261027","/app-icon-192.png","/app-icon-512.png","/apple-touch-icon.png","/app-icon.svg?v=20261027","/brand/tripmate-mark.svg?v=20261027","/app-icon-192.png?v=20261027","/app-icon-512.png?v=20261027","/apple-touch-icon.png?v=20261027"];
 
 self.addEventListener("install",(event)=>{
   event.waitUntil(caches.open(CACHE).then((cache)=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
