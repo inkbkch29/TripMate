@@ -6,7 +6,7 @@ const path=require('node:path');
 (async()=>{
  const target=path.resolve(__dirname,'../public');
  const mark=await fs.readFile(path.join(target,'brand/tripmate-mark.svg'),'utf8');
- const icon=mark.replace('<defs>','<rect width="1024" height="1024" fill="#FFFFFF"/><defs>');
+ const icon=mark.replace('<defs>','<rect width="1024" height="1024" fill="#FFFFFF"/><g transform="translate(51.2 51.2) scale(.9)"><defs>').replace('</svg>','</g></svg>');
  await fs.writeFile(path.join(target,'app-icon.svg'),icon);
  for(const [name,size] of [['app-icon-1024.png',1024],['app-icon-512.png',512],['app-icon-192.png',192],['apple-touch-icon.png',180],['app-icon-64.png',64],['favicon-32.png',32]]){
   await sharp(Buffer.from(icon)).resize(size,size).png().toFile(path.join(target,name));
