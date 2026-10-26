@@ -6,6 +6,7 @@ export const collectionPaymentConfirmed=(collection,id)=>collection.paid?.includ
 // Legacy per-person dues may be short of the bill by a few cents. Once all
 // actual receipts are known, reconcile against the real bill, not rounded dues.
 export function collectionFundTotals(collection) {
+ if(collection.collectionOnly)return {expected:0,received:0,roundingAdjustment:0};
  const participants=[...new Set(collection.participants||[])];
  const original=participants.filter(id=>!collection.lateJoin?.newcomers?.includes(id));
  const expected=cents(collection.fundRemainder||0);
@@ -45,7 +46,7 @@ export function tripLedger(expenses,collections,settlements,memberIds){
  for(const collection of eligibleCollections){
   const participants=[...new Set(collection.participants||[])];
   const fundOnly=Boolean(collection.isFund);
-  if(!fundOnly&&!collection.expenseId&&!collection.installmentId)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
+  if(!fundOnly&&!collection.collectionOnly&&!collection.expenseId&&!collection.installmentId)cost+=cents(collection.originalAmount??(Number(collection.amount)-Number(collection.fundRemainder||0)));
   const funding=collectionFundTotals(collection);
   fundExpected+=cents(funding.expected);fundReceived+=cents(funding.received);
   participants.forEach(id=>{
@@ -61,5 +62,5 @@ export function tripLedger(expenses,collections,settlements,memberIds){
   if(totals[debt.to])totals[debt.to][receive]+=cents(debt.amount);
  }
  for(const row of Object.values(totals))for(const key of Object.keys(row))row[key]/=100;
- return {approved,costEntryCount:approved.length+eligibleCollections.filter(c=>!c.isFund&&!c.expenseId&&!c.installmentId).length,expenseBalances,expenseTransfers,dues,totals,cost:cost/100,fundExpected:fundExpected/100,fundReceived:fundReceived/100};
+ return {approved,costEntryCount:approved.length+eligibleCollections.filter(c=>!c.isFund&&!c.collectionOnly&&!c.expenseId&&!c.installmentId).length,expenseBalances,expenseTransfers,dues,totals,cost:cost/100,fundExpected:fundExpected/100,fundReceived:fundReceived/100};
 }

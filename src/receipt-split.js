@@ -99,3 +99,11 @@ export function moveReceiptItemToExtra(receipt,itemId,field){
  if(!item||!Number.isSafeInteger(amount)||amount<=0||!Number.isSafeInteger(existing)||existing<0)throw new Error('ตรวจราคาของรายการก่อนย้าย');
  return {...receipt,items:receipt.items.filter(row=>row.id!==itemId),[field]:(existing+amount)/100,reviewed:false};
 }
+
+// Quantity is optional metadata. Legacy amount remains the line total.
+export function receiptQuantity(item,patch){
+ const quantity=patch.quantity??item.quantity??1;
+ const unitAmount=patch.unitAmount??item.unitAmount??item.amount??'';
+ const valid=Number.isSafeInteger(Number(quantity))&&Number(quantity)>0;
+ return {...patch,quantity,unitAmount,amount:valid&&unitAmount!==''?String(cents(unitAmount)*Number(quantity)/100):''};
+}

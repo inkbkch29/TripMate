@@ -1,9 +1,14 @@
+import PaymentRequestDialog from './PaymentRequestDialog';
 import React,{useEffect,useRef,useState} from 'react';
 import {Alert,Box,Button,Checkbox,Dialog,DialogTitle,DialogContent,DialogActions,FormControlLabel,MenuItem,Stack,Switch,TextField,Typography} from '@mui/material';
 import {satang} from './trip-fund';
 import {isCollectionComplete} from './collection-utils';
 const currency=value=>new Intl.NumberFormat('th-TH',{style:'currency',currency:'THB',maximumFractionDigits:2}).format(Number(value||0));
-export default function CollectionDialog({ open, onClose, onSave, members, currentUserId, item=null, defaultFund=false, onPaymentSettings }) {
+export default function CollectionDialog({ open, onClose, onSave, members, currentUserId, item=null, defaultFund=false, defaultRequest=false, onPaymentSettings }) {
+  if((defaultRequest&&!defaultFund&&!item)||item?.collectionOnly)return <PaymentRequestDialog {...{open,onClose,onSave,members,currentUserId,item}}/>;
+  return <LegacyCollectionDialog {...{open,onClose,onSave,members,currentUserId,item,defaultFund,onPaymentSettings}}/>;
+}
+function LegacyCollectionDialog({open,onClose,onSave,members,currentUserId,item,defaultFund,onPaymentSettings}){
   const requestId=useRef(''), collectionId=useRef('');
   const [form, setForm] = useState({ title: "", amount: "", perPersonAmount: "", calculationMethod: "total", isFund:false, roundRemainder:false, due: "", receiver: currentUserId || members[0]?.id || "",participants:[] }); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   useEffect(() => {if(!open)return;requestId.current=crypto.randomUUID();collectionId.current=item?.id||crypto.randomUUID();setForm(item?{title:item.title,amount:item.originalAmount??item.amount,perPersonAmount:item.isFund?item.perPerson:"",calculationMethod:item.isFund?"perPerson":"total",isFund:Boolean(item.isFund),roundRemainder:Number(item.fundRemainder)>0,due:item.due,receiver:item.receiver,participants:item.participants,contributionAmounts:item.isFund?Object.fromEntries(item.participants.map(id=>[id,item.payments?.[id]?.amount??item.perPerson])):undefined}:{title:"",amount:"",perPersonAmount:"",calculationMethod:defaultFund?"perPerson":"total",isFund:defaultFund,roundRemainder:!defaultFund,due:"",receiver:currentUserId||members[0]?.id||"",participants:members.map((m)=>m.id)});setError("");}, [open,item?.id,currentUserId,members.length,defaultFund]);
