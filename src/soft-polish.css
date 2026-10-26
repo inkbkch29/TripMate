@@ -52,3 +52,11 @@ main,.logo,.hero img{animation:none!important}
 .tripmate-brand-mark.guest-welcome-icon{width:88px!important;height:88px!important;background:transparent!important;box-shadow:none!important;border-radius:0!important;margin:0 auto 12px}
 .loading-screen>.tripmate-brand-mark{width:112px;height:112px;margin-bottom:8px}
 .topbar .brand-copy> .MuiTypography-root,.topbar .MuiToolbar-root> .MuiBox-root> .MuiTypography-root:first-child{color:#203A50}
+
+/* The loading car follows the road to the brand pin; reduced motion keeps it parked. */
+.loading-journey{position:relative;width:240px;height:136px;margin-bottom:8px;flex-shrink:0}
+.loading-journey .loading-destination{position:absolute;left:178px;top:-12px;width:64px;height:64px}
+.loading-journey-car{position:absolute;left:0;top:0;offset-path:path('M24 110C6 53 111 141 111 77S172 31 208 48');offset-rotate:auto;offset-distance:0%;animation:loading-road-trip 3s ease-in-out infinite;font-size:29px;line-height:1}
+.loading-journey-car>span{display:block;transform:scaleX(-1)}
+@keyframes loading-road-trip{0%,10%{offset-distance:0%;opacity:0}18%{opacity:1}82%{offset-distance:100%;opacity:1}95%,100%{offset-distance:100%;opacity:0}}
+@media(prefers-reduced-motion:reduce){.loading-journey-car{animation:none!important;offset-distance:35%;opacity:1}}
