@@ -28,7 +28,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { divIcon } from "leaflet";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { ThemeProvider } from "@mui/material/styles";
 import {
   Alert, AppBar, Avatar, AvatarGroup, Badge, BottomNavigation, BottomNavigationAction, Box, Button,
   Card, CardContent, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
@@ -61,35 +61,12 @@ import { isConnectionError, queueLabels } from "./offline-queue";
 import { useOfflineQueue } from "./use-offline-queue";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
+import "./soft-polish.css";
+import theme from "./theme";
 
 const VAPID_PUBLIC_KEY="BNTJKZem_jVdsEvVt82o6Bo0uy4DFVWDrWZgGWwh8i7X9nSY1qgkvlYaakKrQhHtj1H-pXkJObVVnNxJ6RbcQ-E";
 const urlBase64ToBytes=(value)=>{const padding="=".repeat((4-value.length%4)%4);const raw=atob((value+padding).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(raw,(char)=>char.charCodeAt(0));};
 
-const theme = createTheme({
-  palette: {
-    primary: { main: "#69B5E5", dark: "#287FAF", light: "#EAF7FF" },
-    secondary: { main: "#F4C95D", dark: "#8A6813", light: "#FFF6D9" },
-    success: { main: "#4FAE83" }, warning: { main: "#F4C95D" }, error: { main: "#E66D6D" },
-    background: { default: "#F7FBFE", paper: "#FFFFFF" },
-    text: { primary: "#20354A", secondary: "#718096" },
-  },
-  shape: { borderRadius: 18 },
-  typography: {
-    fontFamily: '"Nunito", "Anuphan", "Noto Sans Thai", system-ui, sans-serif',
-    h4: { fontSize: "clamp(1.75rem, 6vw, 2rem)", fontWeight: 800, letterSpacing: "-.025em", lineHeight: 1.2 },
-    h5: { fontSize: "1.35rem", fontWeight: 750, letterSpacing: "-.015em", lineHeight: 1.3 },
-    h6: { fontSize: "1.08rem", fontWeight: 750, lineHeight: 1.35 },
-    overline: { fontSize: ".7rem", fontWeight: 800, letterSpacing: ".16em" },
-    body1: { fontSize: ".95rem", lineHeight: 1.58 }, body2: { fontSize: ".875rem", lineHeight: 1.55 }, caption: { fontSize: ".78rem", lineHeight: 1.45 }, button: { textTransform: "none", fontWeight: 750, letterSpacing: "-.01em" },
-  },
-  components: {
-    MuiButton: { styleOverrides: { root: { minHeight: 44, borderRadius: 16, boxShadow: "none", transition: "transform .22s ease, box-shadow .22s ease, background-color .22s ease" }, containedPrimary: { color: "#fff", background: "#69B5E5", boxShadow: "0 6px 18px rgba(40,127,175,.16)" }, containedSecondary: { color: "#5C4812", background: "#F4C95D" }, outlined: { borderColor: "#D9EAF4", background: "rgba(255,255,255,.92)" } } },
-    MuiCard: { styleOverrides: { root: { borderRadius: 20, border: "1px solid #D9EAF4", boxShadow: "0 6px 24px rgba(31,72,104,.07)" } } },
-    MuiTextField: { defaultProps: { fullWidth: true }, styleOverrides: { root: { "& .MuiOutlinedInput-root": { borderRadius: 16, background: "rgba(255,255,255,.94)", "& fieldset": { borderColor: "#D9EAF4" }, "&:hover fieldset": { borderColor: "#A9D5EE" }, "&.Mui-focused fieldset": { borderWidth: 1.5 } } } } },
-    MuiChip: { styleOverrides: { root: { borderRadius: 999, fontWeight: 750 } } },
-    MuiIconButton: { styleOverrides: { root: { transition: "transform .2s ease, background-color .2s ease" } } },
-  },
-});
 
 const membersSeed = [
   { id: "u1", name: "มินท์", role: "เจ้าของทริป", color: "#86c9ed", emoji: "👩🏻", promptpay: "0812345678", online: true },

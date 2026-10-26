@@ -1,0 +1,46 @@
+/* Shared everyday surfaces. Cover photography and exported Recap remain scoped separately. */
+:root{--ink:#203A50;--muted:#5D7485;--glam-gradient:#247E9E;--line:#E5EEF3}
+body{background:#F6FAFC!important;color:#203A50;animation:none!important}body:before{display:none!important}
+main,.logo,.hero img{animation:none!important}
+.logo{background:#247E9E!important;box-shadow:none!important}
+.MuiButton-root{transition:transform 160ms ease,background-color 160ms ease,color 160ms ease,border-color 160ms ease!important}
+.MuiButton-containedPrimary,.MuiDialog-root .MuiButton-containedPrimary{background:#247E9E!important;color:#fff!important;box-shadow:none!important}
+.MuiButton-containedPrimary:hover{background:#1B657F!important}
+.MuiButton-containedSecondary{background:#267D6F!important;color:#fff!important;box-shadow:none!important}
+.MuiButton-outlinedPrimary{background:#fff!important;border-color:#C8DEE8!important;color:#247E9E!important}
+.MuiButton-textPrimary{color:#247E9E}
+.MuiButton-root.Mui-disabled{background:#E9EFF2!important;color:#7A8B96!important;box-shadow:none!important;transform:none!important}
+.MuiButton-root:active,.MuiIconButton-root:active{transform:scale(.98)!important;box-shadow:none!important}
+.MuiButtonBase-root:focus-visible{outline:3px solid #65BCE5!important;outline-offset:2px}
+.MuiCardActionArea-root:active,.setting-nav-row:active,.settings-tile:active,.trip-vote-card:active{transform:scale(.99)}
+.MuiDialog-paper{background:#fff!important}.MuiOutlinedInput-root{background:#fff!important;border-radius:14px!important}
+.MuiAlert-root{background-image:none!important;box-shadow:none!important}
+.MuiCard-root{box-shadow:0 2px 8px rgba(32,58,80,.025)!important;border-color:#E5EEF3!important}
+.settings-summary,.settings-tile,.setting-nav-row,.trip-vote-card,.trip-vote-row,.transaction-list,.collection-card.is-complete,.countdown-card,.trip-eta-card{background:#fff!important;box-shadow:none!important}
+.settings-page.MuiStack-root{background:#F6FAFC!important}
+.setting-nav-icon,.settings-page .settings-tile-icon,.profile-list-icon,.countdown-icon{background:#EAF6FC!important;color:#258CAD!important;box-shadow:none!important;border-radius:13px!important}
+.setting-nav-icon{width:40px!important;height:40px!important;flex:0 0 40px!important}
+.setting-nav-row.mint .setting-nav-icon{background:#E8F8F3!important;color:#248D7D!important}
+.trip-vote-icon{background:#FFF1C9!important;color:#A47B27!important;box-shadow:none!important}
+.transaction-icon{background:#FFF1E7!important;color:#B97846!important}
+.profile-photo-button{background:#EAF6FC!important;color:#247E9E!important}
+.sheet-handle{background:#D7E6EE!important}
+.money-segments,.expense-view-switch{background:#EAF6FC!important}
+.money-segments .MuiButton-contained{background:#247E9E!important;color:#fff!important}
+.fund-summary-card{background:#E8F8F3!important}.fund-summary-card .MuiAvatar-root{background:#267D6F!important}
+.balance-card,.now-card{background:#247E9E!important;box-shadow:none!important}
+.stat-card,.stat-card:nth-child(2){background:#EAF6FC!important}
+.date-rail button.active{background:#EAF6FC!important;box-shadow:none!important}
+.empty{background:#F6FAFC!important;box-shadow:none!important}.empty:before{display:none!important}
+.MuiBottomNavigation-root{background:#fff!important;box-shadow:0 2px 16px rgba(32,58,80,.06)!important}
+.MuiBottomNavigationAction-root.Mui-selected{background:#EAF6FC!important;border-radius:14px!important;color:#247E9E!important}
+.MuiBottomNavigationAction-root.Mui-selected:before{background:#247E9E!important;box-shadow:none!important}
+.MuiBottomNavigationAction-root.Mui-selected .MuiSvgIcon-root,.MuiBottomNavigationAction-root.Mui-selected .MuiBottomNavigationAction-label{color:#247E9E!important}
+.MuiLinearProgress-barColorPrimary{background:#247E9E!important}
+.feature-icon{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:13px}.feature-icon .MuiSvgIcon-root{font-size:22px}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.MuiButtonBase-root:active,.setting-nav-row:active,.settings-tile:active{transform:none!important}}
+
+.trip-mode-heading{background:#EAF6FC!important}.filter-chips .MuiChip-colorPrimary,.filter-chips .MuiChip-colorSuccess{background:#247E9E!important;box-shadow:none!important}
+.poll-choice-result{padding-top:8px}.poll-choice{transition:background-color 160ms ease,border-color 160ms ease!important}.poll-choice.selected{background:#E8F8F3!important;border-color:#77B9AB!important}
+.trip-poll-sheet .MuiButton-contained,.receipt-editor .MuiButton-contained,.compact-settings-sheet .MuiButton-contained{background:#247E9E!important;box-shadow:none!important}
+@media(prefers-reduced-motion:reduce){.MuiButton-root,.poll-choice{transition:none!important}}
