@@ -44,3 +44,11 @@ main,.logo,.hero img{animation:none!important}
 .poll-choice-result{padding-top:8px}.poll-choice{transition:background-color 160ms ease,border-color 160ms ease!important}.poll-choice.selected{background:#E8F8F3!important;border-color:#77B9AB!important}
 .trip-poll-sheet .MuiButton-contained,.receipt-editor .MuiButton-contained,.compact-settings-sheet .MuiButton-contained{background:#247E9E!important;box-shadow:none!important}
 @media(prefers-reduced-motion:reduce){.MuiButton-root,.poll-choice{transition:none!important}}
+
+/* Brand mark keeps its own transparent silhouette, without the former blue disc. */
+.tripmate-brand-mark{display:block;object-fit:contain;flex-shrink:0}
+.tripmate-brand-mark.logo{width:44px!important;height:44px!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;animation:none!important}
+.tripmate-brand-mark.auth-logo{width:88px!important;height:88px!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;margin:0 auto 12px!important}
+.tripmate-brand-mark.guest-welcome-icon{width:88px!important;height:88px!important;background:transparent!important;box-shadow:none!important;border-radius:0!important;margin:0 auto 12px}
+.loading-screen>.tripmate-brand-mark{width:112px;height:112px;margin-bottom:8px}
+.topbar .brand-copy> .MuiTypography-root,.topbar .MuiToolbar-root> .MuiBox-root> .MuiTypography-root:first-child{color:#203A50}
