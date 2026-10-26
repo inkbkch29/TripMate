@@ -7,10 +7,10 @@ it('uses Bangkok calendar dates and respects explicit completed status',()=>{
  expect(tripPhase(trip,'2026-11-01')).toBe('active');expect(tripPhase(trip,'2026-11-03')).toBe('completed');
  expect(tripPhase({...trip,status:'completed'},'2026-10-25')).toBe('completed');
 });
-it('sorts the next planning activity and avoids earlier activities during travel',()=>{
+it('uses the clock rather than old manual completion flags for the planning activity',()=>{
  const stops=[{id:'later',day:2,time:'08:00'},{id:'late',day:1,time:'12:00'},{id:'early',day:1,time:'09:00'},{id:'done',day:1,time:'07:00',done:true}],trip={start_date:'2026-10-26',end_date:'2026-10-28'};
- expect(nextPlanningStop(stops,trip,new Date('2026-10-25T08:00:00+07:00')).id).toBe('early');
- expect(nextPlanningStop(stops,trip,new Date('2026-10-26T10:00:00+07:00')).id).toBe('late');
+ expect(nextPlanningStop(stops,trip,new Date('2026-10-25T08:00:00+07:00')).id).toBe('done');
+ expect(nextPlanningStop(stops,trip,new Date('2026-10-26T10:00:00+07:00')).id).toBe('early');
  expect(nextPlanningStop([],trip)).toBeNull();
 });
 it('counts a stop once from actual completion/checkins, ignoring orphan checkins',()=>{

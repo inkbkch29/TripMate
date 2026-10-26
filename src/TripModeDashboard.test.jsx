@@ -10,9 +10,9 @@ it('shows a compact upcoming header, four inline packing items, full members in 
  await click(host.querySelector('input[type="checkbox"]'));expect(base.onChecklistToggle).toHaveBeenCalledWith(expect.objectContaining({id:'p0'}),false);
  await click(host.querySelector('[aria-label="ดูสมาชิกทั้งหมด 20 คน"]'));expect(document.querySelectorAll('.home-member-option')).toHaveLength(20);expect(document.body.textContent).toContain('ไม่ได้แชร์ตำแหน่ง');
 });
-it('shows current activity, location freshness, check-in and a consented member map during the trip',async()=>{
+it('shows the scheduled activity without check-in controls while preserving consented member maps',async()=>{
  const check=vi.fn(async()=>{}),now='2026-10-25T10:00:00+07:00',locations=[{user_id:'u0',latitude:14,longitude:100,sharing_enabled:true,updated_at:'2026-10-25T09:59:00+07:00'},{user_id:'u1',latitude:14.1,longitude:100.1,sharing_enabled:true,updated_at:'2026-10-25T09:50:00+07:00'},{user_id:'u2',latitude:14,longitude:100,sharing_enabled:true,updated_at:'2026-10-24T09:59:00+07:00'}];
- await act(async()=>root.render(<TripModeDashboard {...base} now={now} onCheckin={check} locations={locations} stops={[{id:'s',day:1,time:'11:00',title:'กินข้าว',place:'ร้านจริง'}]}/>));expect(host.textContent).toContain('กำลังเดินทาง · วันที่ 1');expect(host.querySelector('[data-testid="member-map"]').textContent).toBe('u0,u1');await click(btn('เช็กอินว่าถึงแล้ว'));expect(check).toHaveBeenCalledWith(expect.objectContaining({id:'s'}),true);
+ await act(async()=>root.render(<TripModeDashboard {...base} now={now} onCheckin={check} locations={locations} stops={[{id:'s',day:1,time:'11:00',title:'กินข้าว',place:'ร้านจริง'}]}/>));expect(host.textContent).toContain('กำลังเดินทาง · วันที่ 1');expect(host.querySelector('[data-testid="member-map"]').textContent).toBe('u0,u1');expect(host.textContent).not.toContain('เช็กอิน');expect(check).not.toHaveBeenCalled();expect(host.querySelector('a[aria-label="นำทางไป ร้านจริง"]').href).toContain('google.com/maps');
  await click(btn('ดูแผนที่เพื่อน'));expect(document.body.textContent).toContain('ตำแหน่งเก่า');expect(document.body.textContent).toContain('ยังไม่มีตำแหน่งล่าสุด');
 });
 it('keeps packing/history accessible after the trip, removes live locations and opens the existing recap',async()=>{
