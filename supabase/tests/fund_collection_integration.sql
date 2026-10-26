@@ -1,0 +1,45 @@
+do $test$
+declare tid uuid;own uuid;mem uuid;cid uuid:=gen_random_uuid();req uuid:=gen_random_uuid();tx uuid;payload jsonb;snap jsonb;before_payment jsonb;old_qr text;
+begin
+ select owner_id into own from public.trips where name='ทดสอบ' limit 1;
+ select id into mem from public.profiles where id<>own limit 1;
+ if own is null or mem is null then raise exception 'Requires authorized test owner and two profiles';end if;
+ begin
+ insert into public.trips(owner_id,name,start_date,end_date,status)values(own,'ทดสอบ · กองกลางใช้เรียกเก็บเดิม',current_date,current_date+1,'completed')returning id into tid;
+ insert into public.trip_members(trip_id,user_id,trip_role)values(tid,own,'owner'),(tid,mem,'member');
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',own,'role','authenticated')::text,true);
+ old_qr:=tid||'/'||own||'/payment-qr-old.png';
+ update public.profiles set account_name='บัญชีเดิม QA',payment_qr_path=old_qr where id=own;
+ payload:=jsonb_build_object('collection_id',cid,'title','สมทบค่าเดินทาง','custodian_id',own,'date',null,'amounts',jsonb_build_object(own,3333,mem,50000));
+ perform public.trip_fund_action(tid,'contribution',payload,req);
+ select receiving_account_snapshot into snap from public.collections where id=cid;
+ if snap->>'account_name'<>'บัญชีเดิม QA' or snap->>'payment_qr_path'<>old_qr or (select collection_type from public.collections where id=cid)<>'TRIP_FUND_CONTRIBUTION' then raise exception 'Settings snapshot/type not captured';end if;
+ if (select due_date from public.collections where id=cid)is not null or public.trip_fund_balance(tid)<>0 or exists(select 1 from public.collection_payments where collection_id=cid and status<>'unpaid') then raise exception 'Request created cash or paid receiver';end if;
+ perform public.trip_fund_action(tid,'contribution',payload,req);
+ if(select count(*) from public.collections where trip_id=tid)<>1 then raise exception 'Retry duplicated request';end if;
+ update public.profiles set account_name='บัญชีใหม่ QA',payment_qr_path=tid||'/'||own||'/payment-qr-new.png' where id=own;
+ if(select receiving_account_snapshot from public.collections where id=cid)<>snap then raise exception 'Profile change rewrote historical account';end if;
+ update public.collection_payments set status='pending',slip_url=tid||'/'||mem||'/collection-slip.png' where collection_id=cid and user_id=mem;
+ if public.trip_fund_balance(tid)<>0 then raise exception 'Pending slip counted as cash';end if;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',mem,'role','authenticated')::text,true);
+ begin perform public.confirm_collection_received(cid,mem,500.01);raise exception 'Member confirmed own payment';exception when others then if sqlerrm='Member confirmed own payment' then raise;end if;end;
+ begin perform public.trip_fund_action(tid,'contribution',payload,gen_random_uuid());raise exception 'Member created money request';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',own,'role','authenticated')::text,true);
+ perform public.confirm_collection_received(cid,mem,500.01);
+ perform public.confirm_collection_received(cid,mem,500.01);
+ select id into tx from public.trip_fund_transactions where collection_id=cid and type='deposit';
+ if public.trip_fund_balance(tid)<>50001 or(select count(*) from public.trip_fund_transactions where collection_id=cid)<>1 then raise exception 'Confirmed cash duplicated or incorrect';end if;
+ if not exists(select 1 from public.trip_fund_transactions where id=tx and payment_collection_id=cid and payment_user_id=mem and receiving_account_snapshot=snap) then raise exception 'Missing composite payment origin or historical account';end if;
+ if not public.can_read_collection_qr(old_qr) then raise exception 'Member lost historical QR access';end if;
+ begin update public.collections set receiving_account_snapshot='{}' where id=cid;raise exception 'Account snapshot overwritten';exception when others then if sqlerrm='Account snapshot overwritten' then raise;end if;end;
+ select to_jsonb(p)into before_payment from public.collection_payments p where collection_id=cid and user_id=mem;
+ req:=gen_random_uuid();payload:=jsonb_build_object('transaction_id',tx,'note','คืนเงินสมทบตามคำขอ QA');
+ perform public.trip_fund_action(tid,'reverse',payload,req);perform public.trip_fund_action(tid,'reverse',payload,req);
+ if public.trip_fund_balance(tid)<>0 or(select count(*) from public.trip_fund_transactions where reversal_of=tx)<>1 then raise exception 'Reversal duplicated or wrong cash';end if;
+ if(select to_jsonb(p) from public.collection_payments p where collection_id=cid and user_id=mem)<>before_payment then raise exception 'Reversal modified payment history';end if;
+ if not exists(select 1 from public.trip_fund_transactions where reversal_of=tx and payment_collection_id=cid and payment_user_id=mem and receiving_account_snapshot=snap)then raise exception 'Reversal lost origin';end if;
+ begin perform public.confirm_collection_received(cid,mem,500.01);raise exception 'Reversed cash counted again';exception when others then if sqlerrm='Reversed cash counted again' then raise;end if;end;
+ raise exception using errcode='PT003',message='rollback fund integration fixtures';
+ exception when sqlstate 'PT003' then null;end;
+ raise notice 'Shared collection/fund integration passed; fixtures rolled back';
+end $test$;
