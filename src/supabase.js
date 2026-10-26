@@ -35,14 +35,14 @@ export async function getMyTripContext() {
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase
       .from("trip_members")
-      .select("trip_role, trips(*)")
+      .select("trip_role, can_manage_fund, can_approve_expenses, can_confirm_payments, trips(*)")
       .eq("user_id", user.id),
   ]),10000,"โหลดบัญชีช้าเกินไป กรุณาลองอีกครั้ง");
   if (error) throw error;
   return {
     user,
     profile,
-    trips: (memberships || []).map((row) => ({ ...row.trips, trip_role: row.trip_role })),
+    trips: (memberships || []).map((row) => ({ ...row.trips, trip_role: row.trip_role,can_manage_fund:row.can_manage_fund,can_approve_expenses:row.can_approve_expenses,can_confirm_payments:row.can_confirm_payments })),
   };
 }
 
@@ -130,7 +130,7 @@ async function signedTripFile(path) {
 
 export async function loadTripData(tripId) {
   const [memberResult, stopResult, expenseResult, collectionResult, locationResult, settlementResult, checkinResult, historyResult, routeStatsResult, checklistResult, installmentResult] = await withTimeout(Promise.all([
-    supabase.from("trip_members").select("trip_role, profiles(*)").eq("trip_id", tripId),
+    supabase.from("trip_members").select("trip_role, can_manage_fund, can_approve_expenses, can_confirm_payments, profiles(*)").eq("trip_id", tripId),
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
     supabase.from("collections").select("*, collection_payments(user_id,amount,status,slip_url,submitted_by,received_amount,installment_superseded_at)").eq("trip_id", tripId).order("created_at", { ascending: false }),
@@ -157,10 +157,10 @@ export async function loadTripData(tripId) {
     const {data:signedRows}=await withTimeout(supabase.storage.from("trip-files").createSignedUrls(uniquePaths,3600),8000,"โหลดรูปประกอบช้าเกินไป").catch(()=>({data:[]}));
     (signedRows||[]).forEach((row,index)=>{signedByPath[row.path||uniquePaths[index]]=row.signedUrl||row.signedURL||"";});
   }
-  const members = memberResult.data.map(({ trip_role, profiles: p }, index) => {
+  const members = memberResult.data.map(({ trip_role, can_manage_fund, can_approve_expenses, can_confirm_payments, profiles: p }, index) => {
     const paymentQr = signedByPath[p.payment_qr_path]||"";
-    const roleLabels={owner:"เจ้าของทริป",planner:"ผู้ดูแลแพลน",treasurer:"เหรัญญิก",member:"สมาชิก"};
-    return { id: p.id, name: p.display_name, avatar: p.avatar_url, promptpay: p.promptpay_id || "", bankName: p.bank_name || "", accountName: p.account_name || "", paymentQr, paymentQrPath: p.payment_qr_path || "", tripRole:trip_role, role:roleLabels[trip_role]||"สมาชิก", color: ["#86c9ed","#e8cf88","#a8daf3","#ddc173","#c8eaff"][index % 5], emoji: "🙂", online: false };
+    const roleLabels={owner:"เจ้าของทริป",planner:"ผู้ดูแลแพลน",treasurer:"สมาชิก",member:"สมาชิก"};
+    return { id: p.id, name: p.display_name, avatar: p.avatar_url, promptpay: p.promptpay_id || "", bankName: p.bank_name || "", accountName: p.account_name || "", paymentQr, paymentQrPath: p.payment_qr_path || "", tripRole:trip_role,finance:{fund:can_manage_fund??trip_role==="treasurer",approve:can_approve_expenses??trip_role==="treasurer",confirm:can_confirm_payments??trip_role==="treasurer"}, role:roleLabels[trip_role]||"สมาชิก", color: ["#86c9ed","#e8cf88","#a8daf3","#ddc173","#c8eaff"][index % 5], emoji: "🙂", online: false };
   });
   return {
     members,
@@ -431,9 +431,11 @@ export async function reviewSettlement(settlementId,status){
   if(error)throw error;
 }
 
-export async function updateTripMemberRole(tripId,userId,role){
-  const {error}=await supabase.from("trip_members").update({trip_role:role}).eq("trip_id",tripId).eq("user_id",userId);
-  if(error)throw error;
+export async function updateTripMemberRole(tripId,userId,role,finance={},requestId=crypto.randomUUID()){
+  const {error}=await supabase.rpc("set_trip_member_access",{target_trip:tripId,target_user:userId,target_role:role,finance,request_id:requestId});if(error)throw error;
+}
+export async function transferTripOwnership(tripId,userId,confirmation,requestId=crypto.randomUUID()){
+  const {error}=await supabase.rpc("transfer_trip_ownership",{target_trip:tripId,target_user:userId,confirmation,request_id:requestId});if(error)throw error;
 }
 
 export async function setStopCheckin(stopId,userId,checkedIn){
