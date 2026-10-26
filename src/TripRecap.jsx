@@ -1,10 +1,10 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {Alert,Box,Button,Checkbox,CircularProgress,Dialog,DialogActions,DialogContent,DialogTitle,FormControlLabel,IconButton,Slider,Stack,Switch,TextField,Typography} from '@mui/material';
-import {CameraAltRounded,ChevronLeftRounded,CloseRounded,DownloadRounded,EditRounded,KeyboardArrowDownRounded,KeyboardArrowUpRounded,ShareRounded} from '@mui/icons-material';
+import {CameraAltRounded,ChevronLeftRounded,CloseRounded,DownloadRounded,EditRounded,ShareRounded} from '@mui/icons-material';
 import {compressImage} from './image-utils';
 import {renderRecapStory} from './recap-story';
 import {tripLedger} from './trip-ledger';
-import {orderRecapStops} from './recap-route';
+import {recapRoutePlaces} from './recap-places';
 import AvatarColorPicker from './AvatarColorPicker';
 import RecapCoverPreview from './RecapCoverPreview';
 import {loadRecapConfiguration,normalizeHex,saveRecapColor} from './recap-color';
@@ -18,11 +18,11 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
  const [draft,setDraft]=useState([]);
  const [coverTitle,setCoverTitle]=useState(()=>trip?.name||'');
  useEffect(()=>setCoverTitle(trip?.name||''),[trip?.id,trip?.name]);
- useEffect(()=>{setDraft(orderRecapStops(stops).map(p=>({...p,enabled:true,title:p.title||p.place||'สถานที่'})));setCustom('');setSource('cover');setCrop({zoom:1,x:50,y:50});setAvatarColor(loadRecapConfiguration(trip?.id).avatarColor);},[trip?.id]);
- useEffect(()=>{setDraft(old=>orderRecapStops(stops).map(p=>{const saved=old.find(d=>d.id===p.id);return {...p,enabled:saved?.enabled??true,title:saved?.title??p.title??p.place??'สถานที่'};}));},[JSON.stringify(stops.map(p=>[p.id,p.title,p.day,p.time,p.sortOrder,p.latitude,p.longitude,p.googleMapsUrl]))]);
+ useEffect(()=>{setDraft(recapRoutePlaces(stops).map(p=>({...p,enabled:true})));setCustom('');setSource('cover');setCrop({zoom:1,x:50,y:50});setAvatarColor(loadRecapConfiguration(trip?.id).avatarColor);},[trip?.id]);
+ useEffect(()=>{setDraft(old=>recapRoutePlaces(stops).map(p=>{const saved=old.find(d=>d.id===p.id);return {...p,enabled:saved?.enabled??true};}));},[JSON.stringify(stops.map(p=>[p.id,p.place,p.day,p.time,p.sortOrder]))]);
  useEffect(()=>{return()=>{if(custom)URL.revokeObjectURL(custom);};},[custom]);
  const imageSrc=source==='custom'?custom:source==='cover'?(trip?.cover_url||'/assets/trip-hero-landscape-v4.webp'):'';
- const places=draft.filter(p=>p.enabled).map(p=>({...p,title:p.title.trim()||p.place||'สถานที่'}));
+ const places=recapRoutePlaces(draft);
  useEffect(()=>{
   if(!open)return;
   let active=true;const id=++generation.current;setPreview(old=>({...old,busy:true}));
@@ -33,7 +33,7 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
  const upload=async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type))return setError('เลือกรูป JPG, PNG หรือ WebP');if(file.size>15*1024*1024)return setError('เลือกรูปไม่เกิน 15 MB');setUploading(true);setError('');try{const compressed=await compressImage(file,{maxWidth:2200,maxHeight:2200});setCustom(URL.createObjectURL(compressed));setSource('custom');setCrop({zoom:1,x:50,y:50});}catch{setError('อ่านรูปไม่ได้ กรุณาเลือกรูปใหม่');}finally{setUploading(false);}};
  const download=()=>{if(!preview.blob||preview.busy)return;const a=document.createElement('a');a.href=preview.url;a.download=`TripMate-${(trip?.name||'recap').replace(/[\\/:*?"<>|]/g,'-')}.${fileType==='image/jpeg'?'jpg':'png'}`;a.click();};
  const share=async()=>{try{const file=new File([preview.blob],`TripMate-recap.${fileType==='image/jpeg'?'jpg':'png'}`,{type:fileType});if(navigator.canShare?.({files:[file]}))await navigator.share({files:[file],title:trip?.name||'Trip Recap'});else download();}catch(err){if(err.name!=='AbortError')setError('แชร์ไม่ได้ ลองบันทึกรูปแล้วแชร์จากอัลบั้ม');}};
- const move=(index,direction)=>setDraft(old=>{const next=[...old],target=index+direction;if(target<0||target>=next.length)return old;[next[index],next[target]]=[next[target],next[index]];return next;});
+
  const close=()=>setOpen(false);
  return <Stack spacing={2.5} className="trip-recap recap-redesign">
   <Box><Typography variant="overline">OUR LITTLE GETAWAY</Typography><Typography variant="h4">ความทรงจำของทริปนี้ ♡</Typography><Typography color="text.secondary">รูปเดียว เก็บช่วงเวลาดี ๆ ของเราไว้</Typography></Box>
@@ -52,7 +52,7 @@ export default function TripRecap({trip,members,stops,expenses,collections=[],tr
      <Box className="recap-display-options"><FormControlLabel control={<Switch checked={showExpenses} onChange={e=>{setPreview({url:'',blob:null,busy:true});setShowExpenses(e.target.checked);}}/>} label="แสดงค่าใช้จ่ายในรูป"/><FormControlLabel control={<Switch checked={showRoute} onChange={e=>setShowRoute(e.target.checked)}/>} label="เส้นทางหมายเลขบนรูปปก"/><Typography variant="caption" color="text.secondary">เรียงตามสถานที่ที่เลือก · เส้นทางตกแต่ง ไม่ใช่ตำแหน่งบนแผนที่</Typography></Box>
      <Typography variant="caption" color="text.secondary">Instagram Story · 1080 × 1920 px · ทุกองค์ประกอบรวมอยู่ในไฟล์ภาพ</Typography>
      <Box><Typography fontWeight={800} mb={1}>ไฟล์ภาพ</Typography><Stack direction="row" gap={1}>{[['image/png','PNG'],['image/jpeg','JPG']].map(([type,label])=><Button key={type} variant={fileType===type?'contained':'outlined'} onClick={()=>setFileType(type)}>{label}</Button>)}</Stack></Box>
-     <Button startIcon={<EditRounded/>} onClick={()=>setEditing(v=>!v)}>{editing?'ซ่อนรายการสถานที่':'เลือกสถานที่ในรูป'}</Button>{editing&&<Stack spacing={1} className="recap-places-editor">{draft.length===0&&<Typography variant="body2">ยังไม่มีสถานที่ ก็สร้าง Recap ได้</Typography>}{draft.map((p,i)=><Box className="recap-place-row" key={p.id}><Checkbox checked={p.enabled} inputProps={{'aria-label':`แสดงสถานที่ ${i+1}`}} onChange={e=>setDraft(old=>old.map(d=>d.id===p.id?{...d,enabled:e.target.checked}:d))}/><TextField size="small" value={p.title} disabled={!p.enabled} inputProps={{'aria-label':`ชื่อสถานที่ ${i+1}`,maxLength:100}} onChange={e=>setDraft(old=>old.map(d=>d.id===p.id?{...d,title:e.target.value}:d))}/><IconButton disabled={i===0} aria-label={`เลื่อนสถานที่ ${i+1} ขึ้น`} onClick={()=>move(i,-1)}><KeyboardArrowUpRounded/></IconButton><IconButton disabled={i===draft.length-1} aria-label={`เลื่อนสถานที่ ${i+1} ลง`} onClick={()=>move(i,1)}><KeyboardArrowDownRounded/></IconButton></Box>)}</Stack>}
+     <Button startIcon={<EditRounded/>} onClick={()=>setEditing(v=>!v)}>{editing?'ซ่อนรายการสถานที่':'เลือกสถานที่ในรูป'}</Button>{editing&&<Stack spacing={1} className="recap-places-editor">{draft.length===0&&<Typography variant="body2">ยังไม่มีสถานที่ ก็สร้าง Recap ได้</Typography>}{draft.map((p,i)=><Box className="recap-place-row" key={p.id}><Checkbox checked={p.enabled} inputProps={{'aria-label':`แสดงสถานที่ ${i+1}`}} onChange={e=>setDraft(old=>old.map(d=>d.id===p.id?{...d,enabled:e.target.checked}:d))}/><TextField size="small" value={p.place} disabled={!p.enabled} InputProps={{readOnly:true}} inputProps={{'aria-label':`ชื่อสถานที่ ${i+1}`,maxLength:100}}/></Box>)}</Stack>}
     </Stack></Box></DialogContent><DialogActions><Button onClick={close}>ปิด</Button><Button startIcon={<DownloadRounded/>} disabled={preview.busy||uploading||!preview.blob} onClick={download}>บันทึกรูป</Button><Button variant="contained" startIcon={<ShareRounded/>} disabled={preview.busy||uploading||!preview.blob} onClick={share}>แชร์</Button></DialogActions>
   </Dialog>
  </Stack>;

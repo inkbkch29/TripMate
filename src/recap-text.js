@@ -15,8 +15,4 @@ export function storyDateLabel(trip){
  if(days>1)range+=year!==endYear?`, ${year} – ${month(end)} ${end.getUTCDate()}`:start.getUTCMonth()!==end.getUTCMonth()?` – ${month(end)} ${end.getUTCDate()}`:`–${end.getUTCDate()}`;
  return `${range}, ${endYear} · ${days}D${days-1}N`;
 }
-export function storyPlaceTitle(place){
- const explicit=englishName(place?.english_name||place?.title_en||place?.name_en||place?.englishName);if(explicit)return explicit;
- const title=englishName(place?.title||place?.place);
- return ({'เข้าที่พัก':'Check-in','เช็คอิน':'Check-in','เช็กอิน':'Check-in','ออกจากที่พัก':'Check-out','เช็คเอาท์':'Check-out'})[title]||title||'Stop';
-}
+export {recapPlaceName as storyPlaceTitle} from './recap-places';

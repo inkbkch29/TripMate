@@ -1,4 +1,5 @@
-import {storyDateLabel,storyTripTitle,storyPlaceTitle} from './recap-text';
+import {recapRoutePlaces} from './recap-places';
+import {storyDateLabel,storyTripTitle} from './recap-text';
 export {storyDateLabel} from './recap-text';
 import {normalizeHex} from './recap-color';
 import {loadTravelStatIcons} from './recap-stat-icons';
@@ -27,7 +28,7 @@ export async function renderRecapStory({trip,dateLabel,coverTitle,members=[],pla
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.shadowColor='rgba(9,24,32,.38)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
  ctx.font='800 25px Nunito,sans-serif';ctx.fillText('TRIPMATE / THE MEMORY EDIT',80,130);
  ctx.font='500 29px "Anuphan",sans-serif';ctx.fillText(ellipsis(ctx,storyDateLabel(trip,dateLabel),920),80,180);
- const coverPlaces=places.map(place=>({...place,title:storyPlaceTitle(place)}));
+ const coverPlaces=recapRoutePlaces(places);
 
  if(showRoute)drawNumberedRoute(ctx,coverPlaces,{x:130,y:360,width:820,height:430},{color});
  ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
@@ -35,7 +36,7 @@ export async function renderRecapStory({trip,dateLabel,coverTitle,members=[],pla
  ctx.font='700 26px Nunito,sans-serif';ctx.fillStyle='#f1f7fb';ctx.fillText(`Our Travel Crew · ${members.length}`,80,1430);
  const size=82,people=participantLayout(members.length,920,{avatarSize:size,defaultOverlap:20,minAvatarSize:49.2});
  members.forEach((member,index)=>{const s=people.avatarSize,left=80+index*people.step,top=1452+(size-s)/2,cx=left+s/2,cy=top+s/2,r=(s-5)/2;ctx.save();ctx.shadowBlur=0;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();ctx.fillStyle=color;ctx.fillRect(left,top,s,s);if(avatars[index]){const image=avatars[index],rect=coverImageRect(image.naturalWidth,image.naturalHeight,s,s);ctx.drawImage(image,left+rect.x,top+rect.y,rect.width,rect.height);}else{ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`800 ${s*.4}px "Anuphan",sans-serif`;ctx.fillText(participantInitial(member.name),cx,cy);}ctx.restore();ctx.strokeStyle='#ffffffd9';ctx.lineWidth=5;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();});
- drawTravelStats(ctx,{places:places.length,total,showExpenses,yOffset:230},icons);
+ drawTravelStats(ctx,{places:coverPlaces.length,total,showExpenses,yOffset:230},icons);
  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='600 30px Nunito,sans-serif';ctx.fillText("Trip's over, memories aren't. ♡",540,1800);ctx.fillStyle='#d1dfe5';ctx.font='500 21px Nunito,sans-serif';ctx.fillText('Made with TripMate',540,1844);
  return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('สร้างรูปไม่สำเร็จ กรุณาลองใหม่')),fileType==='image/jpeg'?'image/jpeg':'image/png',.94));
 }

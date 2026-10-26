@@ -11,11 +11,10 @@ describe('English cover copy',()=>{
   expect(storyDateLabel({})).toBe('');expect(storyDateLabel({start_date:'2026-02-30'})).toBe('');
   expect(storyDateLabel({start_date:'2026-10-21',end_date:'2026-10-20'})).toBe('Oct 21, 2026');
  });
- it('prefers explicit English names, preserves real place names and translates system actions only',()=>{
-  expect(storyPlaceTitle({title:'น้ำตกเอราวัณ'})).toBe('น้ำตกเอราวัณ');
-  expect(storyPlaceTitle({title:'น้ำตกเอราวัณ',name_en:'Erawan Falls'})).toBe('Erawan Falls');
-  expect(storyPlaceTitle({title:'เข้าที่พัก'})).toBe('Check-in');
-  expect(storyPlaceTitle({title:'เข้าที่พักริมน้ำ'})).toBe('เข้าที่พักริมน้ำ');
+ it('uses the actual place field without translations or activity/English-name fallbacks',()=>{
+  expect(storyPlaceTitle({place:'น้ำตกเอราวัณ',title:'ไปเที่ยวน้ำตก',name_en:'Erawan Falls'})).toBe('น้ำตกเอราวัณ');
+  expect(storyPlaceTitle({title:'เข้าที่พัก'})).toBe('');
+  expect(storyPlaceTitle({place:'บ้านอิงภู',title:'เข้าที่พัก'})).toBe('บ้านอิงภู');
   expect(storyTripTitle({name:'กาญจนบุรี'})).toBe('Kanchanaburi');
   expect(storyTripTitle({name:'ทดสอบ',english_name:'Weekend Escape'})).toBe('Weekend Escape');
   expect(storyTripTitle({name:'Weekend Escape'})).toBe('Weekend Escape');
