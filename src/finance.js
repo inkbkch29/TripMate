@@ -1,3 +1,4 @@
+import {allocateSatang} from './trip-fund';
 export const splitAmount = (amount, participants) => {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0 || !participants?.length) return [];
@@ -13,14 +14,15 @@ export const splitAmount = (amount, participants) => {
 export const calculateBalances = (expenses, memberIds) => {
   const balance = Object.fromEntries(memberIds.map((id) => [id, 0]));
   expenses.forEach((expense) => {
-    const amount = Number(expense.amount);
+    const funded=Math.min(Math.round(Number(expense.amount)*100),Number(expense.fundPaidSatang||0));
+    const amount = (Math.round(Number(expense.amount)*100)-funded)/100;
     if (!balance.hasOwnProperty(expense.paidBy) || !Number.isFinite(amount)) return;
-    balance[expense.paidBy] += amount;
-    expenseShares(expense).forEach(({ userId, amount: share }) => {
-      if (balance.hasOwnProperty(userId)) balance[userId] -= share;
+    balance[expense.paidBy] += Math.round(amount*100);
+    expenseOutstandingShares(expense).forEach(({userId,amount:share})=>{
+      if (balance.hasOwnProperty(userId)) balance[userId] -= Math.round(share*100);
     });
   });
-  return Object.fromEntries(Object.entries(balance).map(([id, value]) => [id, Math.round(value * 100) / 100]));
+  return Object.fromEntries(Object.entries(balance).map(([id, value]) => [id, value / 100]));
 };
 
 // Shares returned by the database are amounts, including for percentage splits.
@@ -63,3 +65,5 @@ export const simplifyDebts = (balances) => {
   }
   return transfers;
 };
+
+export function expenseOutstandingShares(expense){const original=expenseShares(expense),total=Math.round(Number(expense.amount)*100),funded=Math.min(total,Number(expense.fundPaidSatang||0));if(!funded)return original;const amounts=allocateSatang(total-funded,Object.fromEntries(original.map(row=>[row.userId,Math.round(row.amount*100)])));return original.map(row=>({...row,amount:Number(amounts[row.userId]||0)/100}));}
