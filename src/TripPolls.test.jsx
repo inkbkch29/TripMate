@@ -32,7 +32,7 @@ it('opens photos and named voters without navigating away',async()=>{
 it('lets an ordinary member create a draft with compact optional fields',async()=>{
  const api={save:vi.fn(async()=> 'token')},saved=vi.fn();await act(async()=>root.render(<PollFormDialog open tripId="trip" userId="member" api={api} onClose={()=>{}} onSaved={saved}/>));
  expect(document.querySelectorAll('details[open]')).toHaveLength(0);const inputs=document.querySelectorAll('input');await input(inputs[0],'ที่พัก');
- const names=[...document.querySelectorAll('input')].filter(i=>i.closest('.poll-option-editor')&&!i.type.includes('file')&&i.type!=='number');await input(names[0],'บ้าน A');await input(names[1],'บ้าน B');await click(button('เก็บเป็นร่าง'));
+ const names=[...document.querySelectorAll('label')].filter(l=>/^ตัวเลือก \d+$/.test(l.textContent)).map(l=>document.getElementById(l.htmlFor));await input(names[0],'บ้าน A');await input(names[1],'บ้าน B');await click(button('เก็บเป็นร่าง'));
  expect(api.save).toHaveBeenCalledWith('trip','member',expect.objectContaining({title:'ที่พัก',status:'draft',options:expect.arrayContaining([expect.objectContaining({name:'บ้าน A'})])}));expect(saved).toHaveBeenCalledWith('token');
 });
 it('restricts overflow actions, confirms reset and keeps completed trips read-only',async()=>{

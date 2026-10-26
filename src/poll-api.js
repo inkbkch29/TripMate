@@ -1,3 +1,4 @@
+import {pollPriceData} from './poll-price';
 import {mapStop} from './trip-mode';
 import {supabase} from './supabase';
 import {compressImage} from './image-utils';
@@ -17,8 +18,8 @@ async function uploadPhoto(tripId,userId,file){
  const {error}=await supabase.storage.from('trip-files').upload(path,photo,{upsert:false,contentType:photo.type});if(error)throw error;return path;
 }
 async function prepareOptions(options,tripId,userId,uploaded){
- const result=[];for(const option of options){const images=[];for(const image of option.images||[]){if(image instanceof File){const path=await uploadPhoto(tripId,userId,image);uploaded.push(path);images.push(path);}else images.push(image);}
- result.push({...option,id:option.id||null,images,links:Array.isArray(option.links)?option.links:pollLinks(option.linkText),price:option.price===''?null:option.price});}return result;
+ const result=[];for(const option of options){const pricing=pollPriceData(option);const images=[];for(const image of option.images||[]){if(image instanceof File){const path=await uploadPhoto(tripId,userId,image);uploaded.push(path);images.push(path);}else images.push(image);}
+ result.push({...option,id:option.id||null,images,links:Array.isArray(option.links)?option.links:pollLinks(option.linkText),...pricing});}return result;
 }
 async function withPhotos(options,tripId,userId,save){const uploaded=[];try{return await save(await prepareOptions(options,tripId,userId,uploaded));}catch(error){if(uploaded.length)await supabase.storage.from('trip-files').remove(uploaded).catch(()=>{});throw error;}}
 export const pollApi={

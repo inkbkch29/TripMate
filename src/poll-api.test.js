@@ -24,3 +24,7 @@ it('adds a source option in one atomic RPC and maps the persisted stop metadata'
  mock.rpc.mockResolvedValue({data:{already_exists:false,stop:{id:'stop',trip_id:'trip',day_number:2,start_time:'10:30:00',title:'เข้าที่พัก',source_poll_id:'p',source_poll_option_id:'o',source_poll_token:'t',price:1200,images:['image'],links:['https://example.com']}}});
  const result=await pollApi.addToPlan({token:'t',round:1},{id:'o'},{day:2,time:'10:30'},true,'request');expect(mock.rpc).toHaveBeenCalledWith('poll_option_to_plan',{poll_token:'t',source_option:'o',plan_data:{day:2,time:'10:30',round:1},allow_another_day:true,request_key:'request'});expect(result.stop).toMatchObject({id:'stop',tripId:'trip',day:2,time:'10:30',sourcePollId:'p',sourcePollOptionId:'o',images:['image'],price:1200});
 });
+it('persists price fields separately and never treats a range as one fixed price',async()=>{
+ await pollApi.save('trip','user',{title:'เลือกที่พัก',options:[{name:'A',priceType:'range',priceMin:'15000',priceMax:'18000',priceUnit:'total'}]});expect(mock.rpc.mock.calls[0][1].poll_options[0]).toMatchObject({price:null,priceType:'range',priceMin:15000,priceMax:18000,priceUnit:'total'});
+ mock.rpc.mockClear();await expect(pollApi.option({token:'t',trip_id:'trip'},'user',{name:'A',priceType:'fixed',priceMin:-1,priceUnit:'person'})).rejects.toThrow();expect(mock.rpc).not.toHaveBeenCalled();
+});
