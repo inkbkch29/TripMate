@@ -1,3 +1,4 @@
+import {packingItem} from './packing-list';
 import {satang} from './trip-fund';
 import {mapStop} from "./trip-mode";
 import { splitAmount } from "./finance";
@@ -175,13 +176,14 @@ export async function loadTripData(tripId) {
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
     locationHistory: historyResult.error ? [] : (historyResult.data || []),
     routeDistance: routeStatsResult.error ? 0 : (routeStatsResult.data || []).reduce((sum,item)=>sum+Number(item.distance_m||0),0),
-    checklist: checklistResult.error ? [] : (checklistResult.data||[]).map(item=>({id:item.id,title:item.title,assignedTo:item.assigned_to,done:item.is_done,visibility:item.visibility||"shared",createdBy:item.created_by})),
+    checklist: checklistResult.error ? [] : (checklistResult.data||[]).map(packingItem),
   };
 }
 
-export async function createChecklistItem(tripId,userId,title,visibility="shared"){const {data,error}=await supabase.from("trip_checklist_items").insert({trip_id:tripId,created_by:userId,title,visibility,assigned_to:visibility==="personal"?userId:null}).select().single();if(error)throw error;return {id:data.id,title:data.title,assignedTo:data.assigned_to,done:data.is_done,visibility:data.visibility,createdBy:data.created_by};}
-export async function toggleChecklistItem(id,done){const {error}=await supabase.rpc("toggle_trip_checklist",{target_item:id,target_done:done});if(error)throw error;}
-export async function deleteChecklistItem(id){const {error}=await supabase.from("trip_checklist_items").delete().eq("id",id);if(error)throw error;}
+export async function manageChecklistItem(tripId,item,operation,payload={}){const {data,error}=await supabase.rpc('manage_trip_packing',{target_trip:tripId,target_item:item.id,operation,payload,expected_revision:item.revision??null});if(error)throw error;return data.deleted?data:packingItem(data);}
+export async function createChecklistItem(tripId,userId,item){return manageChecklistItem(tripId,item,'create',item);}
+export async function toggleChecklistItem(tripId,item,done){return manageChecklistItem(tripId,item,'toggle',{done});}
+export async function deleteChecklistItem(tripId,item){return manageChecklistItem(tripId,item,'delete');}
 export async function trackEvent(eventName,tripId=null,surface=null){const {data:{user}}=await supabase.auth.getUser();if(!user)return;await supabase.from("product_analytics").insert({user_id:user.id,trip_id:tripId,event_name:eventName,surface});}
 
 export async function saveLiveLocation(tripId,userId,coords) {

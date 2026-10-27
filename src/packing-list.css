@@ -1,0 +1,16 @@
+.packing-section{max-width:720px;width:100%;align-self:center;box-sizing:border-box}
+.packing-tabs.MuiToggleButtonGroup-root{padding:4px;background:#fff;border:1px solid #E5EEF3;border-radius:16px;gap:4px}
+.packing-tabs .MuiToggleButton-root{gap:7px;min-height:44px;border:0!important;border-radius:12px!important;text-transform:none;flex:1;color:#5D7485;font-weight:600;transition:background-color 170ms ease,color 170ms ease}
+.packing-tabs .MuiToggleButton-root.Mui-selected{background:#EAF6FC;color:#247E9E}.packing-tabs .MuiToggleButton-root>span{font-size:12px;min-width:18px}
+.packing-progress{padding:10px 0 6px}.packing-progress>.MuiLinearProgress-root{height:4px;border-radius:8px;margin-top:6px;background:#E8F8F3}.packing-progress .MuiLinearProgress-bar{background:#65D0BE!important;transition:transform 170ms ease}
+.packing-item{padding:6px 0}.packing-name{transition:color 170ms ease;overflow-wrap:anywhere}.packing-item.is-done .packing-name{text-decoration:line-through;color:#5D7485}.packing-item .MuiCheckbox-root.Mui-checked{color:#248D7D}.packing-note{display:block;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:3px}
+.packing-status.MuiChip-root{height:24px;font-size:11px;font-weight:500}.packing-status.unassigned{background:#FFF1E7;color:#8C582E}.packing-status.assigned{background:#EAF6FC;color:#247E9E}.packing-status.prepared{background:#E8F8F3;color:#246F60}
+.packing-empty{padding:18px 8px;text-align:center}.packing-type-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.packing-type.MuiButtonBase-root{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:12px;border:1px solid #E5EEF3;border-radius:16px;text-align:left;transition:background-color 170ms ease,border-color 170ms ease}
+.packing-type.selected{background:#EAF6FC;border-color:#247E9E}.packing-type .packing-type-check{position:absolute;right:10px;top:12px;font-size:18px;color:#247E9E}
+.packing-member.MuiButtonBase-root{min-height:56px;border-radius:14px;padding:8px;gap:12px;width:100%}
+.packing-sheet .MuiDialogTitle-root{display:flex;justify-content:space-between;align-items:center;font-size:18px;padding:12px 16px}.packing-sheet .MuiDialogContent-root{padding:8px 16px 16px}.packing-sheet .MuiDialogActions-root{position:sticky;bottom:0;background:#fff;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid #E5EEF3}
+@media(max-width:600px){.packing-sheet .MuiDialog-container{align-items:flex-end}.packing-sheet .MuiDialog-paper{margin:0!important;width:100%;max-height:90dvh;border-radius:20px 20px 0 0!important}.packing-sheet .MuiDialogTitle-root{position:sticky;top:0;z-index:1;background:#fff}}
+@media(prefers-reduced-motion:reduce){.packing-tabs .MuiToggleButton-root,.packing-type.MuiButtonBase-root,.packing-name,.packing-progress .MuiLinearProgress-bar{transition:none!important}}
+
+.packing-tabs.MuiToggleButtonGroup-root .MuiToggleButton-root.Mui-selected,.packing-tabs.MuiToggleButtonGroup-root .MuiToggleButton-root.Mui-selected:hover{background:#EAF6FC;color:#247E9E}
