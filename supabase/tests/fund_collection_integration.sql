@@ -9,6 +9,7 @@ begin
  insert into public.trip_members(trip_id,user_id,trip_role)values(tid,own,'owner'),(tid,mem,'member');
  perform set_config('request.jwt.claims',jsonb_build_object('sub',own,'role','authenticated')::text,true);
  old_qr:=tid||'/'||own||'/payment-qr-old.png';
+ insert into storage.objects(bucket_id,name,owner_id)values('trip-files',old_qr,own::text),('trip-files',tid||'/'||own||'/payment-qr-new.png',own::text),('trip-files',tid||'/'||mem||'/collection-slip.png',mem::text);
  update public.profiles set account_name='บัญชีเดิม QA',payment_qr_path=old_qr where id=own;
  payload:=jsonb_build_object('collection_id',cid,'title','สมทบค่าเดินทาง','custodian_id',own,'date',null,'amounts',jsonb_build_object(own,3333,mem,50000));
  perform public.trip_fund_action(tid,'contribution',payload,req);
