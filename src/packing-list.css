@@ -14,3 +14,5 @@
 @media(prefers-reduced-motion:reduce){.packing-tabs .MuiToggleButton-root,.packing-type.MuiButtonBase-root,.packing-name,.packing-progress .MuiLinearProgress-bar{transition:none!important}}
 
 .packing-tabs.MuiToggleButtonGroup-root .MuiToggleButton-root.Mui-selected,.packing-tabs.MuiToggleButtonGroup-root .MuiToggleButton-root.Mui-selected:hover{background:#EAF6FC;color:#247E9E}
+
+.packing-sheet .MuiAlert-action .MuiButton-root{white-space:nowrap;min-width:108px}

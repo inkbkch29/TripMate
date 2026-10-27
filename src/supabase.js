@@ -180,6 +180,7 @@ export async function loadTripData(tripId) {
   };
 }
 
+export async function loadChecklistItems(tripId){const {data,error}=await supabase.from('trip_checklist_items').select('*').eq('trip_id',tripId).order('created_at');if(error)throw error;return (data||[]).map(packingItem);}
 export async function manageChecklistItem(tripId,item,operation,payload={}){const {data,error}=await supabase.rpc('manage_trip_packing',{target_trip:tripId,target_item:item.id,operation,payload,expected_revision:item.revision??null});if(error)throw error;return data.deleted?data:packingItem(data);}
 export async function createChecklistItem(tripId,userId,item){return manageChecklistItem(tripId,item,'create',item);}
 export async function toggleChecklistItem(tripId,item,done){return manageChecklistItem(tripId,item,'toggle',{done});}

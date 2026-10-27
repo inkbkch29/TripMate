@@ -1,0 +1,22 @@
+{
+  "account_count": 6,
+  "checks": [
+    "6 distinct real password-authenticated sessions",
+    "Every account sees only own private row; owner/planner/outsider cannot read or mutate others via any operation",
+    "Private owner can create/edit/toggle/delete",
+    "Unassigned shared row visible to members; creator alone cannot complete; other members cannot edit/delete/release",
+    "Assignee claims without completion, toggles own shared item, cannot edit/delete another creator item, and releases with progress reset",
+    "Shared creator edits and deletes own row",
+    "Owner/planner manage shared edit/toggle/release/delete but never private rows",
+    "Two simultaneous HTTP claim requests produce exactly one assignee and one rejection",
+    "Create retry ID does not duplicate row",
+    "Direct REST writes cannot bypass RPC permissions",
+    "Shared-to-personal conversion hides row immediately at API for owner/planner/other member/outsider; only creator can read",
+    "Real browser sessions: creator draft vs another member completion kept draft and blocked stale save; load latest then rename succeeded",
+    "Real browser sessions: Planner shared delete initially stayed stale in other account; after shared-only invalidation migration, other account refreshed automatically and removed both stale rows",
+    "Real browser sessions: assignee menu only release, no edit/delete; release reset completion and assignment",
+    "Temporary trip and all 6 QA users/profiles deleted; 2 original checklist rows remain"
+  ],
+  "completed_at": "2026-10-27T02:39:14.639Z",
+  "cleanup": "temporary trip and all 6 test accounts removed; 2 original rows retained"
+}
