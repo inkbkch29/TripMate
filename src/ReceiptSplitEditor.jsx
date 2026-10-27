@@ -1,26 +1,24 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Alert,Avatar,AvatarGroup,Box,Button,ButtonBase,Checkbox,Dialog,DialogActions,DialogContent,DialogTitle,FormControlLabel,IconButton,Stack,TextField,Typography} from '@mui/material';
-import {AddRounded,AttachFileRounded,CloseRounded,DeleteOutlineRounded,EditOutlined,ExpandMoreRounded} from '@mui/icons-material';
+import {Alert,Avatar,AvatarGroup,Box,Button,ButtonBase,Checkbox,FormControlLabel,IconButton,Stack,TextField,Typography} from '@mui/material';
+import {AddRounded,DeleteOutlineRounded,EditOutlined,ExpandMoreRounded} from '@mui/icons-material';
 import {cents,splitReceipt,receiptProgress,receiptQuantity} from './receipt-split';
 import ReceiptMemberPicker from './ReceiptMemberPicker';
+import ReceiptAttachments from './ReceiptAttachments';
 import './receipt-editor.css';
 const money=value=>new Intl.NumberFormat('th-TH',{style:'currency',currency:'THB'}).format(value||0);
 export const blankReceipt=()=>({items:[{id:crypto.randomUUID(),name:'',amount:'',participants:[],category:'food'}],serviceCharge:'',tax:'',discount:'',expectedTotal:'',roundUp:true,reviewed:false});
-export default function ReceiptSplitEditor({value,onChange,members,receiptFile,receiptUrl,onFile,disabled=false}){
- const [selecting,setSelecting]=useState(null),[preview,setPreview]=useState(''),[showPhoto,setShowPhoto]=useState(false),[error,setError]=useState('');
+export default function ReceiptSplitEditor({value,onChange,members,receiptAttachments=[],receiptFiles=[],onAttachmentsChange,disabled=false}){
+ const [selecting,setSelecting]=useState(null);
  const focusNext=useRef(null),inputs=useRef(new Map());
- useEffect(()=>{if(!receiptFile?.type?.startsWith('image/')){setPreview('');return;}const url=URL.createObjectURL(receiptFile);setPreview(url);return()=>URL.revokeObjectURL(url);},[receiptFile]);
  useEffect(()=>{if(focusNext.current&&inputs.current.has(focusNext.current)){inputs.current.get(focusNext.current).focus();focusNext.current=null;}},[value.items.length]);
  const change=patch=>onChange({...value,...patch,reviewed:false});
  const update=(id,patch)=>change({items:value.items.map(item=>item.id===id?{...item,...patch}:item)});
- const ids=members.map(m=>m.id),totals=receiptProgress(value,ids),result=splitReceipt(value,ids),active=value.items.find(item=>item.id===selecting),photo=preview||receiptUrl;
- const attach=file=>{if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>15*1024*1024){setError('เลือกรูป JPG, PNG หรือ WebP ไม่เกิน 15 MB');return;}setError('');onFile(file);};
+ const ids=members.map(m=>m.id),totals=receiptProgress(value,ids),result=splitReceipt(value,ids),active=value.items.find(item=>item.id===selecting);
  const add=()=>{const id=crypto.randomUUID();focusNext.current=id;change({items:[...value.items,{id,name:'',amount:'',participants:[],category:'food'}]});};
  const mismatch=value.expectedTotal!==''&&value.expectedTotal!=null&&cents(value.expectedTotal)!==cents(result.total);
  return <Stack spacing={1.25} className="receipt-editor minimal-split-editor">
   <Box className="split-summary" aria-live="polite">{[['ยอดรวม',totals.subtotal],['แบ่งแล้ว',totals.allocated]].map(([label,amount])=><Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography fontWeight={800}>{money(amount)}</Typography></Box>)}</Box>
-  <Stack direction="row" spacing={.5} alignItems="center"><Button component="label" variant="outlined" size="small" disabled={disabled} startIcon={<AttachFileRounded/>}>แนบรูปบิล<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{attach(event.target.files?.[0]);event.target.value='';}}/></Button>{photo&&<><Button size="small" onClick={()=>setShowPhoto(true)}>ดูรูป</Button><IconButton disabled={disabled} aria-label="ลบรูปบิล" onClick={()=>{onFile(null);setShowPhoto(false);}}><DeleteOutlineRounded fontSize="small"/></IconButton></>}</Stack>
-  {error&&<Alert severity="warning" onClose={()=>setError('')}>{error}</Alert>}
+  <ReceiptAttachments attachments={receiptAttachments} files={receiptFiles} onChange={onAttachmentsChange} disabled={disabled} allowPdf={false} label="แนบรูปบิล"/>
   <Box>{value.items.map((item,index)=>{const selected=members.filter(member=>item.participants?.includes(member.id));return <Box key={item.id} className="split-item-row">
    <Box className="split-item-inputs"><TextField disabled={disabled} size="small" label="ชื่ออาหาร" value={item.name} inputRef={node=>{if(node)inputs.current.set(item.id,node);else inputs.current.delete(item.id);}} inputProps={{'aria-label':`ชื่ออาหาร ${index+1}`}} onChange={event=>update(item.id,{name:event.target.value})}/><TextField disabled={disabled} size="small" InputLabelProps={{shrink:true}} label="ราคา/จาน ฿" type="number" inputProps={{min:0,step:'0.01',inputMode:'decimal','aria-label':`ราคาอาหาร ${index+1}`}} value={item.unitAmount??item.amount} onChange={event=>update(item.id,receiptQuantity(item,{unitAmount:event.target.value}))}/><IconButton disabled={disabled} aria-label={`ลบรายการอาหารที่ ${index+1}`} onClick={()=>change({items:value.items.filter(row=>row.id!==item.id)})}><DeleteOutlineRounded fontSize="small"/></IconButton></Box>
    <Stack direction="row" alignItems="center" gap={1} sx={{mt:1}}><TextField disabled={disabled} size="small" label="จำนวนจาน" type="number" value={item.quantity??1} inputProps={{min:1,step:1,inputMode:'numeric','aria-label':`จำนวนจาน ${index+1}`}} sx={{width:100}} onChange={event=>update(item.id,receiptQuantity(item,{quantity:event.target.value}))}/><Typography variant="caption" color="text.secondary">รวม {money(Number(item.amount))}</Typography></Stack>
@@ -33,6 +31,5 @@ export default function ReceiptSplitEditor({value,onChange,members,receiptFile,r
   {mismatch&&<Alert severity="warning">ยอดไม่ตรงบิล ต่างกัน {money(Math.abs(Number(value.expectedTotal)-result.total))}</Alert>}
   <FormControlLabel disabled={disabled} sx={{m:0}} control={<Checkbox size="small" checked={Boolean(value.reviewed)} onChange={event=>onChange({...value,reviewed:event.target.checked})}/>} label={<Typography variant="body2">ตรวจรายการ ราคา และคนที่หารแล้ว</Typography>}/>
   <ReceiptMemberPicker item={active} members={members} disabled={disabled} onChange={participants=>active&&update(active.id,{participants})} onClose={()=>setSelecting(null)}/>
-  <Dialog open={showPhoto&&Boolean(photo)} onClose={()=>setShowPhoto(false)} fullWidth maxWidth="sm"><DialogTitle><Stack direction="row" justifyContent="space-between" alignItems="center">รูปบิล<IconButton aria-label="ปิดรูปบิล" onClick={()=>setShowPhoto(false)}><CloseRounded/></IconButton></Stack></DialogTitle><DialogContent><Box component="img" src={photo} alt="รูปบิลที่แนบ" sx={{display:'block',width:'100%',objectFit:'contain'}}/></DialogContent><DialogActions><Button onClick={()=>setShowPhoto(false)}>ปิด</Button></DialogActions></Dialog>
  </Stack>;
 }

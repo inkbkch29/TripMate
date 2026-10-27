@@ -24,13 +24,15 @@ it('focuses the appended item and deletes the requested row',async()=>{
  expect(current.items).toHaveLength(3);expect(document.activeElement.getAttribute('aria-label')).toBe('ชื่ออาหาร 3');
  await click(host.querySelector('[aria-label="ลบรายการอาหารที่ 2"]'));expect(current.items.map(i=>i.name)).toEqual(['ข้าว','']);
 });
-it('attaches, replaces and removes a photo without changing manual items',async()=>{
- vi.stubGlobal('URL',Object.assign(URL,{createObjectURL:vi.fn(()=>'/preview.png'),revokeObjectURL:vi.fn()}));
- const files=[];function Photos(){const [file,setFile]=useState(null);return <ReceiptSplitEditor value={{...blankReceipt(),items:[{id:'a',name:'ข้าว',amount:100,participants:['0']}]}} onChange={()=>{}} members={members} receiptFile={file} onFile={next=>{files.push(next);setFile(next);}}/>;}
- await act(async()=>root.render(<Photos/>));const input=host.querySelector('input[type="file"]');
- const first=new File(['first'],'bill.png',{type:'image/png'}),second=new File(['second'],'replacement.jpg',{type:'image/jpeg'});
- for(const file of [first,second]){Object.defineProperty(input,'files',{configurable:true,value:[file]});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));}
- expect(files).toEqual([first,second]);expect(host.querySelector('input[aria-label="ชื่ออาหาร 1"]').value).toBe('ข้าว');
- await click([...host.querySelectorAll('button')].find(b=>b.textContent==='ดูรูป'));expect(document.querySelector('img[alt="รูปบิลที่แนบ"]').getAttribute('src')).toBe('/preview.png');
- await click(document.querySelector('button[aria-label="ปิดรูปบิล"]'));await click(host.querySelector('button[aria-label="ลบรูปบิล"]'));expect(files.at(-1)).toBeNull();expect(host.textContent).not.toContain('ดูรูป');vi.unstubAllGlobals();
+it('appends multiple photos, previews each and removes only the requested photo without changing manual items',async()=>{
+ const create=URL.createObjectURL,revoke=URL.revokeObjectURL;URL.createObjectURL=vi.fn(file=>'/'+file.name);URL.revokeObjectURL=vi.fn();
+ let selected=[];function Photos(){const [files,setFiles]=useState([]);selected=files;return <ReceiptSplitEditor value={{...blankReceipt(),items:[{id:'a',name:'ข้าว',amount:100,participants:['0']}]}} onChange={()=>{}} members={members} receiptFiles={files} onAttachmentsChange={next=>setFiles(next.files)}/>;}
+ try{await act(async()=>root.render(<Photos/>));const input=host.querySelector('input[type="file"]');expect(input.multiple).toBe(true);
+ const first=new File(['first'],'bill.png',{type:'image/png'}),second=new File(['second'],'second.jpg',{type:'image/jpeg'}),third=new File(['third'],'third.png',{type:'image/png'});
+ for(const files of [[first,second],[third]]){Object.defineProperty(input,'files',{configurable:true,value:files});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));}
+ expect(selected).toEqual([first,second,third]);expect(host.querySelector('input[aria-label="ชื่ออาหาร 1"]').value).toBe('ข้าว');
+ await click(host.querySelector('[aria-label="ดูบิล 2 second.jpg"]'));expect(document.querySelector('img[alt="รูปบิลที่แนบ"]').getAttribute('src')).toBe('/second.jpg');
+ await click(document.querySelector('[aria-label="บิลถัดไป"]'));expect(document.querySelector('img[alt="รูปบิลที่แนบ"]').getAttribute('src')).toBe('/third.png');
+ await click(document.querySelector('[aria-label="ปิดรูปบิล"]'));await click(host.querySelector('[aria-label="ลบบิล 2"]'));expect(selected).toEqual([first,third]);expect(URL.revokeObjectURL).toHaveBeenCalledWith('/second.jpg');
+ }finally{await act(async()=>root.render(null));URL.createObjectURL=create;URL.revokeObjectURL=revoke;}
 });
