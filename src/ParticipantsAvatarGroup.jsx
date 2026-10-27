@@ -22,7 +22,7 @@ export default function ParticipantsAvatarGroup({members=[]}){
    <Box className="recap-participant-row" sx={{position:'relative',isolation:'isolate',width:layout.width,maxWidth:'100%',height:40,flexShrink:0}}>
     {members.map((member,index)=><Avatar key={member.id??index} src={member.avatar||undefined} alt={member.name||'สมาชิก'} className="recap-participant-avatar" sx={{position:'absolute',left:index*layout.step,top:(40-layout.avatarSize)/2,width:layout.avatarSize,height:layout.avatarSize,boxSizing:'border-box',border:'2px solid #fff',zIndex:index+1,bgcolor:'primary.light',color:'primary.dark',fontSize:layout.avatarSize*.4,fontWeight:800}}>{participantInitial(member.name)}</Avatar>)}
    </Box>
-   <Typography component="span" variant="caption" color="text.secondary">เพื่อนร่วมทริป · {members.length} คน</Typography>
+   <Typography component="span" variant="caption" color="text.secondary">{members.length} คน</Typography>
   </ButtonBase>
   <Dialog open={open} onClose={()=>setOpen(false)} fullWidth maxWidth="xs" aria-labelledby={titleId}>
    <DialogTitle id={titleId} sx={{display:'flex',alignItems:'center',gap:1}}>เพื่อนร่วมทริป · {members.length} คน<IconButton aria-label="ปิดรายชื่อสมาชิก" sx={{ml:'auto'}} onClick={()=>setOpen(false)}><CloseRounded/></IconButton></DialogTitle>
