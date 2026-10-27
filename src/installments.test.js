@@ -7,3 +7,18 @@ it('supports exact satang allocation and refuses balanced whole-baht mismatch',(
 it('rounds equal cumulative responsibility once rather than biasing the same member every installment',()=>{const p={members:ids.map(user_id=>({user_id,scope:'full',start_number:1})),installments:plan.installments};const shares=Object.values(installmentResponsibilities(p));expect(Math.max(...shares)-Math.min(...shares)).toBe(1);});
 it('counts a migrated parent once and preserves child obligations',()=>{const expenses=[{id:'parent',isInstallmentParent:true,amount:16900,participants:[],paidBy:'a'},{id:'old',amount:8444,paidBy:'a',participants:['a','b']}];const collections=[{id:'c1',installmentId:'i',expenseId:'old',originalAmount:8444,amount:8444,participants:['b'],payments:{b:{amount:8444,status:'unpaid'}},paid:[],receiver:'a'}];const l=tripLedger(expenses,collections,[],['a','b']);expect(l.cost).toBe(16900);expect(l.expenseTransfers).toEqual([]);expect(l.dues[0].amount).toBe(8444);});
 it('fully paid balanced installments settle without phantom satang refunds from the agreed rounding',()=>{const result=previewInstallment(plan,[c],2,{additions:[{user_id:ids[14],scope:'full'}],remainderMember:ids[0]});const parent={...plan,members:result.members};const second={id:'c2',installmentId:'i2',installmentBillSatang:845000,participants:ids,originalAmount:8450,paid:ids,payments:Object.fromEntries(ids.map(id=>[id,{amount:result.charges[id]/100,status:'paid',receivedAmount:result.charges[id]/100}]))};expect(installmentMemberSummary(parent,[c,second]).every(m=>m.remaining===0)).toBe(true);});
+it('carries only unpaid dues and keeps rounded partial-payment balances exact',()=>{
+ const parent={...plan,members:ids.map(user_id=>({user_id,scope:'full',start_number:1})),audit:[{action:'issue'}]};
+ const first={...c,installmentBillSatang:664400,paid:ids.slice(0,11),payments:Object.fromEntries(ids.slice(0,14).map((id,i)=>[id,i<11?{amount:604,status:'paid',receivedAmount:604}:{amount:604,status:'unpaid',superseded:true}]))};
+ const second={id:'c2',installmentId:'i2',installmentBillSatang:1025600,originalAmount:10256,participants:ids,paid:[],payments:Object.fromEntries(ids.map((id,i)=>[id,{amount:i<11?523:1127,status:'unpaid'}]))};
+ let rows=installmentMemberSummary(parent,[first,second]);expect(rows.map(r=>r.remaining)).toEqual(ids.map((_,i)=>i<11?52300:112700));
+ const partial={...second,paid:ids.slice(0,14),payments:Object.fromEntries(ids.map((id,i)=>[id,{amount:i<11?523:1127,status:i<14?'paid':'pending',receivedAmount:i<14?(i<11?523:1127):null}]))};
+ rows=installmentMemberSummary(parent,[first,partial]);expect(rows.slice(0,14).every(r=>r.remaining===0)).toBe(true);expect(rows[14].remaining).toBe(112700);expect(rows.reduce((sum,r)=>sum+r.gross,0)).toBe(1577800);
+ const full={...partial,paid:ids,payments:{...partial.payments,[ids[14]]:{amount:1127,status:'paid',receivedAmount:1127}}};rows=installmentMemberSummary(parent,[first,full]);expect(rows.every(r=>r.remaining===0)).toBe(true);expect(rows.reduce((sum,r)=>sum+r.responsibility,0)).toBe(1690000);expect(rows.reduce((sum,r)=>sum+r.gross,0)).toBe(1690500);expect(rows.reduce((sum,r)=>sum+r.surplus,0)).toBe(500);
+ expect(first.payments[ids[11]].amount).toBe(604);expect(first.payments[ids[11]].status).toBe('unpaid');
+});
+it('does not treat a paid flag with unknown receipts as confirmed rounded cash',()=>{
+ const single={members:[{user_id:'a'}],installments:[{id:'i',number:1,bill_satang:101}],audit:[]};
+ const source={installmentId:'i',installmentBillSatang:101,participants:['a'],paid:['a'],payments:{a:{amount:2,status:'paid',receivedAmount:null}}};
+ expect(installmentMemberSummary(single,[source])[0]).toMatchObject({remaining:200,gross:0,billPaid:0,surplus:0});
+});
