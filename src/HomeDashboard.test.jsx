@@ -25,3 +25,10 @@ it('keeps completed poll history read-only, loads results for ordinary members a
  await act(async()=>root.render(<TripPollSection polls={[poll]} completed canCreate onCreate={create} loadResults={load}/>));expect(host.textContent).not.toContain('สร้างโหวต');expect(host.querySelector('a')).toBeNull();await click([...host.querySelectorAll('button')].find(b=>b.textContent==='ดูผล'));expect(load).toHaveBeenCalledWith(poll);expect(document.querySelector('[role="dialog"]').textContent).toContain('3 คะแนน');expect(create).not.toHaveBeenCalled();
  await act(async()=>root.render(<TripPollSection polls={[poll]} canCreate onCreate={create} loadResults={load}/>));expect(host.querySelector('a').getAttribute('href')).toContain('?vote=token');expect(host.textContent).toContain('สร้างโหวต');await click([...host.querySelectorAll('button')].find(b=>b.textContent==='สร้างโหวต'));expect(create).toHaveBeenCalledOnce();await act(async()=>root.render(<TripPollSection polls={[poll]} canCreate={false} onCreate={create} loadResults={load}/>));expect(host.textContent).not.toContain('สร้างโหวต');expect(host.querySelector('a')).not.toBeNull();
 });
+
+it('shows an unissued installment instead of a false settled status',async()=>{
+ const expenses=[{id:'p',amount:16900,isInstallmentParent:true,installmentPlan:{installments:[{id:'i1',bill_satang:845000},{id:'i2',bill_satang:845000}]}}];
+ const collections=[{installmentId:'i1',receiver:'0',participants:['1'],paid:['1'],payments:{'1':{amount:8456,status:'paid',receivedAmount:8456}}}];
+ await act(async()=>root.render(<HomeDashboard trip={{name:'QA',status:'completed'}} members={members} expenses={expenses} collections={collections}/>));
+ expect(host.textContent).toContain('รอเรียกเก็บงวดถัดไป');expect(host.textContent).toContain('ยังไม่เรียกเก็บ ฿8,450.00');expect(host.textContent).not.toContain('ชำระครบแล้ว');
+});

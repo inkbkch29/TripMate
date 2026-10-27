@@ -18,10 +18,20 @@ it('counts a stop once from actual completion/checkins, ignoring orphan checkins
 });
 it('keeps spending separate from outstanding debt and confirmed settlements',()=>{
  const members=[{id:'a'},{id:'b'}],expenses=[{id:'e',amount:100,paidBy:'a',participants:['a','b'],approvalStatus:'approved'}];
- expect(homeExpenseSummary(expenses,[],[],members)).toEqual({spent:100,outstanding:50,pending:0});
- expect(homeExpenseSummary(expenses,[],[{from:'b',to:'a',amount:50,status:'confirmed'},{from:'b',to:'a',amount:50,status:'pending'}],members)).toEqual({spent:100,outstanding:0,pending:0});
- expect(homeExpenseSummary(expenses,[],[{from:'b',to:'a',amount:50,status:'pending'}],members)).toEqual({spent:100,outstanding:50,pending:1});
+ expect(homeExpenseSummary(expenses,[],[],members)).toEqual({spent:100,outstanding:50,pending:0,unissued:0});
+ expect(homeExpenseSummary(expenses,[],[{from:'b',to:'a',amount:50,status:'confirmed'},{from:'b',to:'a',amount:50,status:'pending'}],members)).toEqual({spent:100,outstanding:0,pending:0,unissued:0});
+ expect(homeExpenseSummary(expenses,[],[{from:'b',to:'a',amount:50,status:'pending'}],members)).toEqual({spent:100,outstanding:50,pending:1,unissued:0});
  const linked={id:'c',expenseId:'e',amount:100,perPerson:50,receiver:'a',participants:['a','b'],paid:['b']};
- expect(homeExpenseSummary(expenses,[linked],[],members)).toEqual({spent:100,outstanding:0,pending:0});
- expect(homeExpenseSummary([],[{...linked,expenseId:null,isFund:true,paid:[]}],[],members)).toEqual({spent:0,outstanding:50,pending:0});
+ expect(homeExpenseSummary(expenses,[linked],[],members)).toEqual({spent:100,outstanding:0,pending:0,unissued:0});
+ expect(homeExpenseSummary([],[{...linked,expenseId:null,isFund:true,paid:[]}],[],members)).toEqual({spent:0,outstanding:50,pending:0,unissued:0});
+});
+
+it('does not claim settlement while later installments have not been billed',()=>{
+ const members=[{id:'a'},{id:'b'}],plan={installments:[{id:'i1',bill_satang:845000},{id:'i2',bill_satang:845000}]};
+ const expense={id:'p',amount:16900,isInstallmentParent:true,installmentPlan:plan};
+ const first={id:'c1',installmentId:'i1',receiver:'a',participants:['b'],paid:['b'],payments:{b:{amount:8456,status:'paid',receivedAmount:8456}}};
+ expect(homeExpenseSummary([expense],[first],[],members)).toEqual({spent:16900,outstanding:0,pending:0,unissued:8450});
+ const second={id:'c2',installmentId:'i2',receiver:'a',participants:['b'],paid:[],payments:{b:{amount:8450,status:'unpaid'}}};
+ expect(homeExpenseSummary([expense],[first,second],[],members)).toEqual({spent:16900,outstanding:8450,pending:0,unissued:0});
+ expect(homeExpenseSummary([expense],[first,{...second,paid:['b'],payments:{b:{amount:8450,status:'paid',receivedAmount:8450}}}],[],members)).toEqual({spent:16900,outstanding:0,pending:0,unissued:0});
 });
