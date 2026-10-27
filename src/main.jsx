@@ -745,7 +745,7 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
       showToast(permission==="granted"?"เปิดการแจ้งเตือนแล้ว":"ยังไม่ได้อนุญาตการแจ้งเตือน",permission==="granted"?"success":"info");
     }catch{
       closeNotificationPrompt();
-      showToast("เปิดการแจ้งเตือนไม่สำเร็จ กรุณาตรวจในการตั้งค่า iPhone","warning");
+      showToast("เปิดการแจ้งเตือนไม่สำเร็จ กรุณาตรวจสอบการตั้งค่าการแจ้งเตือน","warning");
     }
   };
   useEffect(()=>{if(account&&"Notification" in window&&Notification.permission==="granted")ensurePushSubscription().catch(()=>{});},[account?.user.id]);
@@ -808,7 +808,7 @@ function App({ account = null, trip = null, trips=[], onTripChange, onNewTrip, o
         <Stack spacing={2} alignItems="center" textAlign="center" pt={1}>
           <Avatar className="notification-permission-icon"><NotificationsRounded/></Avatar>
           <Box><Typography variant="h5" fontWeight={900}>ไม่พลาดอัปเดตจากทริป</Typography><Typography color="text.secondary" mt={.7}>รับแจ้งเตือนเมื่อมีคำขอเข้าร่วม แผนเปลี่ยน หรือรายการชำระเงินที่ต้องจัดการ</Typography></Box>
-          <Alert severity="info">คุณปิดการแจ้งเตือนได้ทุกเมื่อในการตั้งค่า iPhone</Alert>
+          <Alert severity="info">ปิดการแจ้งเตือนได้ทุกเมื่อในการตั้งค่าการแจ้งเตือน</Alert>
           <Button fullWidth variant="contained" startIcon={<NotificationsRounded/>} onClick={requestNotificationPermission}>อนุญาตการแจ้งเตือน</Button>
           <Button fullWidth color="inherit" onClick={closeNotificationPrompt}>ไว้ทีหลัง</Button>
         </Stack>
