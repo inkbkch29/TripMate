@@ -1,0 +1,20 @@
+begin;
+do $$declare tid uuid;owner_id uuid;ids uuid[];cid uuid:=gen_random_uuid();u uuid;req uuid:=gen_random_uuid();n bigint;before_rows jsonb;after_rows jsonb;begin
+ select array_agg(id) into ids from(select id from public.profiles order by id limit 14)p;if cardinality(ids)<>14 then raise exception 'Need 14 fixture members';end if;owner_id:=ids[1];
+ insert into public.trips(name,owner_id,start_date,end_date,status)values('QA legacy rounding review rollback',owner_id,current_date,current_date+1,'planning')returning id into tid;
+ insert into public.trip_members(trip_id,user_id,trip_role)select tid,x,case when x=owner_id then 'owner' else 'member' end from unnest(ids)x;
+ insert into public.collections(id,trip_id,title,amount,original_amount,fund_remainder,receiver_id,created_by)values(cid,tid,'QA 14 × 604',8456,8450,6,owner_id,owner_id);
+ insert into public.collection_payments(collection_id,user_id,amount,status,received_amount,confirmed_at)select cid,x,604,'paid',case when x=owner_id then 604 else null end,case when x=owner_id then now()else null end from unnest(ids)x;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',owner_id,'role','authenticated')::text,true);
+ if public.trip_fund_balance(tid)<>0 or exists(select 1 from public.trip_fund_rounding(tid)where available_satang>0)then raise exception 'Unknown cash was counted as fund';end if;
+ select jsonb_agg(jsonb_build_object('user_id',user_id,'status',status,'amount',amount,'slip_url',slip_url)order by user_id)into before_rows from public.collection_payments where collection_id=cid;
+ foreach u in array ids loop if u<>owner_id then perform public.confirm_collection_received(cid,u,604);end if;end loop;
+ select jsonb_agg(jsonb_build_object('user_id',user_id,'status',status,'amount',amount,'slip_url',slip_url)order by user_id)into after_rows from public.collection_payments where collection_id=cid;
+ if before_rows<>after_rows then raise exception 'Review changed dues/status/slips';end if;
+ select available_satang into n from public.trip_fund_rounding(tid)where collection_id=cid;if n<>600 or public.trip_fund_balance(tid)<>0 then raise exception 'Review should expose exactly 6 pending allocation';end if;
+ perform public.trip_fund_action(tid,'rounding',jsonb_build_object('collection_id',cid,'amount_satang',600,'custodian_id',owner_id,'note','QA explicit approval'),req);
+ perform public.trip_fund_action(tid,'rounding',jsonb_build_object('collection_id',cid,'amount_satang',600,'custodian_id',owner_id,'note','QA explicit approval'),req);
+ if public.trip_fund_balance(tid)<>600 or(select count(*)from public.trip_fund_transactions where collection_id=cid and type='rounding')<>1 then raise exception 'Fund allocation duplicated';end if;
+ if exists(select 1 from public.trip_fund_rounding(tid)where collection_id=cid and available_satang>0)then raise exception 'Posted surplus still available';end if;
+end$$;
+rollback;
