@@ -1,3 +1,4 @@
+import {conciseNotificationCopy} from "../_shared/notification-copy.js";
 import {sendWithRetry} from "./delivery.js";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
@@ -29,7 +30,7 @@ Deno.serve(async(req)=>{
     if(activityError||!activity)throw new Error("Activity not found");
     if(!trustedDispatch&&activity.actor_id!==user!.id)throw new Error("Only the activity owner can send this push");
     const dedupeKey=`activity:${activity.id}`;
-    const {data:notificationRows,error:notificationError}=await admin.from("user_notifications").select("id,recipient_id,title,body,target").eq("dedupe_key",dedupeKey);
+    const {data:notificationRows,error:notificationError}=await admin.from("user_notifications").select("id,recipient_id,type,title,body,target").eq("dedupe_key",dedupeKey);
     if(notificationError)throw notificationError;
     const notifications=(notificationRows||[]).filter(item=>!item.target?.pushedAt);
     if(!notifications?.length)return Response.json({sent:0,deduped:true},{headers:corsHeaders});
@@ -43,7 +44,8 @@ Deno.serve(async(req)=>{
       const notification=notificationsByUser.get(subscription.user_id);
       if(!notification)continue;
       if((notification.target?.deliveredSubscriptionIds||[]).includes(subscription.id))continue;
-      const payload=JSON.stringify({title:notification.title||"TripMate",body:notification.body,url:`/?notification=${notification.id}`,tag:`trip-activity-${activity.id}`});
+      const copy=conciseNotificationCopy(notification);
+      const payload=JSON.stringify({title:copy?.title||notification.title||"อัปเดตทริป",body:copy?.description||notification.body,url:`/?notification=${notification.id}`,tag:`trip-activity-${activity.id}`});
       try{
         await sendWithRetry(()=>webpush.sendNotification({endpoint:subscription.endpoint,keys:{p256dh:subscription.p256dh,auth:subscription.auth}},payload,{TTL:900,urgency:"normal"}));
         sent+=1;
