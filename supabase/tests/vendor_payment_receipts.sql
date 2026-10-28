@@ -1,0 +1,22 @@
+begin;
+do $$declare tid uuid;uid uuid;other_uid uuid;parent uuid;iid uuid;p1 text;p2 text;foreign_path text;r jsonb;payload jsonb;req uuid:=gen_random_uuid();begin
+ select owner_id into uid from public.trips where name='ทดสอบ'limit 1;select id into other_uid from public.profiles where id<>uid limit 1;
+ insert into public.trips(name,owner_id,start_date,end_date,status)values('QA vendor receipts rollback',uid,current_date,current_date+1,'planning')returning id into tid;
+ insert into public.trip_members(trip_id,user_id,trip_role)values(tid,uid,'owner'),(tid,other_uid,'member');
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',uid,'role','authenticated')::text,true);
+ r:=public.installment_expense_action(tid,'create',jsonb_build_object('title','QA accommodation','total_satang',10000,'members',jsonb_build_array(jsonb_build_object('user_id',uid)),'installments',jsonb_build_array(jsonb_build_object('title','deposit','bill_satang',10000))),gen_random_uuid());
+ parent:=(r->>'expense_id')::uuid;iid:=(r->'installments'->0->>'id')::uuid;
+ p1:=tid||'/'||uid||'/proof-one.png';p2:=tid||'/'||uid||'/proof-two.jpg';foreign_path:=gen_random_uuid()||'/'||uid||'/foreign.png';
+ insert into storage.objects(bucket_id,name,owner_id)values('trip-files',p1,uid::text),('trip-files',p2,uid::text),('trip-files',foreign_path,uid::text);
+ payload:=jsonb_build_object('parent_id',parent,'revision',1,'installment_id',iid,'amount_satang',10000,'note','QA confirmed transfer','receipt_attachments',jsonb_build_array(jsonb_build_object('path',p1,'type','image/png','name','one.png'),jsonb_build_object('path',p2,'type','image/jpeg','name','two.jpg')));
+ begin perform public.installment_expense_action(tid,'vendor',jsonb_set(payload,'{receipt_attachments,0,path}',to_jsonb(foreign_path)),gen_random_uuid());raise exception 'Foreign proof accepted';exception when raise_exception then if sqlerrm='Foreign proof accepted'then raise;end if;end;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',other_uid,'role','authenticated')::text,true);
+ begin perform public.installment_expense_action(tid,'vendor',payload,gen_random_uuid());raise exception 'Unauthorized payment accepted';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',uid,'role','authenticated')::text,true);
+ r:=public.installment_expense_action(tid,'vendor',payload,req);perform public.installment_expense_action(tid,'vendor',payload,req);
+ if(select count(*)from public.expense_installment_vendor_payments where trip_id=tid)<>1 or(select sum(amount_satang)from public.expense_installment_vendor_payments where trip_id=tid)<>10000 then raise exception 'Vendor payment duplicated';end if;
+ if r->'installments'->0->'vendor_payments'->0->'receipt_attachments' is distinct from payload->'receipt_attachments' then raise exception 'Snapshot lost proof';end if;
+ if not public.trip_financial_file_locked(p1)or not public.trip_financial_file_locked(p2)then raise exception 'Proof not protected';end if;
+ if(select sum(amount)from public.expenses where trip_id=tid)<>100 or public.trip_fund_balance(tid)<>0 then raise exception 'Cost/fund changed';end if;
+end$$;
+rollback;
