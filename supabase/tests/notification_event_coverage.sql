@@ -1,0 +1,26 @@
+begin;
+do $$declare tid uuid;a uuid;b uuid;c uuid;cid uuid:=gen_random_uuid();p text;n integer;begin
+ select owner_id into a from public.trips where name='ทดสอบ'limit 1;select id into b from public.profiles where id<>a limit 1;select id into c from public.profiles where id not in(a,b)limit 1;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',a,'role','authenticated')::text,true);
+ insert into public.trips(name,owner_id,start_date,end_date,status)values('QA notification coverage rollback',a,current_date,current_date+1,'planning')returning id into tid;
+ insert into public.trip_members(trip_id,user_id,trip_role)values(tid,a,'owner'),(tid,b,'member');
+ insert into public.trip_members(trip_id,user_id,trip_role)values(tid,c,'member');
+ if not exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=b and type='trip_members')then raise exception 'Member join alert missing';end if;
+ perform public.save_collection_request(tid,cid,jsonb_build_object('title','QA invoice','receiver_id',a,'amounts',jsonb_build_object(b,1000)));
+ if not exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=b and type='collections' and target->>'entityId'=cid::text)then raise exception 'Invoice alert missing';end if;
+ p:=tid||'/'||b||'/notification-proof.png';insert into storage.objects(bucket_id,name,owner_id)values('trip-files',p,b::text);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',b,'role','authenticated')::text,true);
+ perform public.submit_collection_payment(cid,p,b);
+ if not exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=a and target->>'event'='payment_submitted')then raise exception 'Receiver pending slip alert missing';end if;
+ if exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=c and target->>'event'='payment_submitted')then raise exception 'Pending slip leaked to unrelated member';end if;
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',a,'role','authenticated')::text,true);
+ perform public.confirm_collection_received(cid,b,10);select count(*)into n from public.user_notifications where trip_id=tid and target->>'event'='payment_confirmed';
+ perform public.confirm_collection_received(cid,b,10);
+ if n<>1 or(select count(*)from public.user_notifications where trip_id=tid and target->>'event'='payment_confirmed')<>n then raise exception 'Confirmation missing or duplicated';end if;
+ insert into public.notification_preferences(user_id,type,enabled)values(c,'expenses',false)on conflict(user_id,type)do update set enabled=false;
+ perform public.trip_fund_action(tid,'adjustment',jsonb_build_object('custodian_id',a,'amount_satang',100,'title','QA fund','note','QA explicit synthetic ledger'),gen_random_uuid());
+ if not exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=b and type='trip_fund_transactions')then raise exception 'Fund alert missing';end if;
+ if exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=c and type='trip_fund_transactions')then raise exception 'Fund ignored expense preference';end if;
+ if exists(select 1 from public.user_notifications where trip_id=tid and recipient_id=a and type='trip_fund_transactions')then raise exception 'Actor got own fund alert';end if;
+end$$;
+rollback;
