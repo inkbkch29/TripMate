@@ -35,5 +35,13 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.webmanifest?v=20261027",
+      "id": "https://trip-mate-eta-weld.vercel.app/"
+    }
+  ],
+  "prefer_related_applications": false
 }
