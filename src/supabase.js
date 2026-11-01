@@ -326,7 +326,7 @@ export async function uploadTripFile(tripId, userId, kind, file) {
   if(!allowedTypes[file.type])throw new Error("รองรับเฉพาะไฟล์ JPG, PNG, WebP หรือ PDF");
   if(kind==="payment-qr"&&file.type==="application/pdf")throw new Error("QR รับเงินต้องเป็นไฟล์รูปภาพ");
   if (file.size > 15 * 1024 * 1024) throw new Error("ไฟล์ต้นฉบับต้องมีขนาดไม่เกิน 15 MB");
-  const uploadFile=file.type==="application/pdf"?file:await compressImage(file,{maxWidth:kind==="payment-qr"?1800:1600,maxHeight:kind==="payment-qr"?1800:1600,quality:kind==="payment-qr"?.9:.84});
+  const uploadFile=file.type==="application/pdf"||kind==="payment-qr"?file:await compressImage(file,{maxWidth:1600,maxHeight:1600,quality:.84});
   const extension = allowedTypes[uploadFile.type];
   const path = tripFilePath(tripId,userId,kind,extension);
   const { error } = await supabase.storage.from("trip-files").upload(path, uploadFile, { upsert: false,contentType:uploadFile.type });
