@@ -38,3 +38,10 @@ describe("collection priority", () => {
     expect(filterCollections(rows, "mine", "b", today).map((item) => item.id)).toEqual(["later", "pending", "soon", "overdue"]);
   });
 });
+
+it('excludes paid collections from overdue and due-soon even when paid is represented by statuses',()=>{
+ const today=new Date(2026,10,1);
+ const rows=[collection('late','2026-10-31'),collection('paid','2026-10-31',['a','b']),{...collection('paid-soon','2026-11-02'),payments:{a:{status:'paid'},b:{status:'paid'}}},collection('soon','2026-11-02')];
+ expect(filterCollections(rows,'overdue','a',today).map(c=>c.id)).toEqual(['late']);
+ expect(filterCollections(rows,'due-soon','a',today).map(c=>c.id)).toEqual(['soon']);
+});

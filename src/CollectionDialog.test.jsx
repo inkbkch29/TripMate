@@ -39,3 +39,12 @@ it('uses the historical receiving snapshot and never falls back to a changed QR'
  expect(collectionReceiver({...request,receivingAccount:{...request.receivingAccount,paymentQr:''}},members).paymentQr).toBe('');
  expect(collectionReceiver({receiver:'a'},members).paymentQr).toBe('old-qr');
 });
+
+it('creates a request with exact individual dues and preserves the id when saving fails',async()=>{
+ const save=vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce();
+ await mounted(<CollectionDialog open defaultRequest members={members} currentUserId="a" onSave={save} onClose={()=>{}}/>,async()=>{
+ await fill('ชื่อรายการ','เก็บค่ารถ');await fill('จำนวนเงินต่อคน','123.45');await click(button('สร้างรายการ'));expect(document.body.textContent).toContain('offline');await click(button('สร้างรายการ'));
+ expect(save).toHaveBeenCalledTimes(2);expect(save.mock.calls[1][0].id).toBe(save.mock.calls[0][0].id);
+ expect(save.mock.calls[1][0]).toMatchObject({title:'เก็บค่ารถ',collectionOnly:true,isFund:false,amount:246.9,requestAmounts:{a:123.45,b:123.45},paid:[]});
+ });
+});

@@ -135,7 +135,7 @@ export async function loadTripData(tripId) {
     supabase.from("trip_members").select("trip_role, can_manage_fund, can_approve_expenses, can_confirm_payments, profiles(*)").eq("trip_id", tripId),
     supabase.from("trip_stops").select("*").eq("trip_id", tripId).order("day_number").order("sort_order"),
     supabase.from("expenses").select("*, expense_participants(user_id,share_amount)").eq("trip_id", tripId).order("created_at", { ascending: false }),
-    supabase.from("collections").select("*, collection_payments(user_id,amount,status,slip_url,submitted_by,received_amount,installment_superseded_at)").eq("trip_id", tripId).order("created_at", { ascending: false }),
+    supabase.from("collections").select("*, collection_payments(user_id,amount,status,slip_url,submitted_by,received_amount,rejection_reason,rejected_at,installment_superseded_at)").eq("trip_id", tripId).order("created_at", { ascending: false }),
     supabase.rpc("trip_live_locations",{target_trip:tripId}),
     supabase.from("trip_settlements").select("*").eq("trip_id",tripId),
     supabase.from("trip_stop_checkins").select("*, trip_stops!inner(trip_id)").eq("trip_stops.trip_id",tripId),
@@ -171,9 +171,9 @@ export async function loadTripData(tripId) {
       const receiptUrl = signedByPath[e.receipt_path]||"";
       return { id: e.id, title: e.title,isInstallmentParent:Boolean(e.is_installment_parent),installmentSource:collectionResult.data.some(c=>c.expense_id===e.id&&c.installment_id),installmentPlan:(installmentResult.data||[]).find(p=>p.expense_id===e.id)||null, amount: e.fund_only?Number(e.fund_paid_satang)/100:Number(e.amount), fundPaidSatang:Number(e.fund_paid_satang||0),fundOnly:Boolean(e.fund_only), paidBy: e.paid_by, participants: e.expense_participants.map((p) => p.user_id), shares: Object.fromEntries(e.expense_participants.map((p) => [p.user_id, Number(p.share_amount)])), category: e.category, expenseDate: e.expense_date || e.created_at?.slice(0,10), mealPeriod: e.meal_period || "other", splitMethod: e.split_method || "equal", approvalStatus: e.approval_status || "approved", receiptBreakdown:e.receipt_breakdown||null, receiptPath: e.receipt_path || "", receiptUrl, receiptAttachments:expenseAttachments({receiptPath:e.receipt_path,receiptUrl,receiptAttachments:(e.receipt_attachments||[]).map(row=>({...row,url:signedByPath[row.path]||""}))}), createdBy: e.created_by, reviewNote: e.review_note || "", revision:e.revision||1, updatedAt:e.updated_at };
     }).filter(e=>!e.fundOnly||e.amount>0),
-    collections: collectionResult.data.map((c) => ({ id: c.id, createdBy:c.created_by, title: c.title,installmentId:c.installment_id||null,installmentBillSatang:c.installment_bill_satang==null?null:Number(c.installment_bill_satang),installmentFundPaidSatang:Number((installmentResult.data||[]).flatMap(p=>p.receipts).find(p=>p.collection_id===c.id)?.fund_paid_satang||0), createdAt:c.created_at, expenseId:c.expense_id||null, fundShares:c.fund_shares||null, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund),fundAccountLabel:c.fund_account_label||"",collectionType:c.collection_type,collectionOnly:Boolean(c.collection_only),receivingAccount:c.receiving_account_snapshot?{...c.receiving_account_snapshot,paymentQr:signedByPath[c.receiving_account_snapshot.payment_qr_path]||""}:null, perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status,superseded:Boolean(p.installment_superseded_at),cashReceivedSatang:(installmentResult.data||[]).flatMap(plan=>plan.receipts).find(row=>row.collection_id===c.id&&row.user_id===p.user_id)?.cash_satang??null, amount:Number(p.amount), receivedAmount:p.received_amount==null?null:Number(p.received_amount), submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
+    collections: collectionResult.data.map((c) => ({ id: c.id, createdBy:c.created_by, title: c.title,installmentId:c.installment_id||null,installmentBillSatang:c.installment_bill_satang==null?null:Number(c.installment_bill_satang),installmentFundPaidSatang:Number((installmentResult.data||[]).flatMap(p=>p.receipts).find(p=>p.collection_id===c.id)?.fund_paid_satang||0), createdAt:c.created_at, expenseId:c.expense_id||null, fundShares:c.fund_shares||null, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund),fundAccountLabel:c.fund_account_label||"",collectionType:c.collection_type,collectionOnly:Boolean(c.collection_only),receivingAccount:c.receiving_account_snapshot?{...c.receiving_account_snapshot,paymentQr:signedByPath[c.receiving_account_snapshot.payment_qr_path]||""}:null, perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status,rejectionReason:p.rejection_reason||"",rejectedAt:p.rejected_at||null,superseded:Boolean(p.installment_superseded_at),cashReceivedSatang:(installmentResult.data||[]).flatMap(plan=>plan.receipts).find(row=>row.collection_id===c.id&&row.user_id===p.user_id)?.cash_satang??null, amount:Number(p.amount), receivedAmount:p.received_amount==null?null:Number(p.received_amount), submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
-    settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
+    settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,submittedBy:s.submitted_by||s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
     locationHistory: historyResult.error ? [] : (historyResult.data || []),
     routeDistance: routeStatsResult.error ? 0 : (routeStatsResult.data || []).reduce((sum,item)=>sum+Number(item.distance_m||0),0),
@@ -419,13 +419,18 @@ export async function confirmCollectionPayment(collectionId, memberId, receivedA
   if(error)throw error;
 }
 
+export async function rejectCollectionPayment(collectionId,memberId,slipPath,reason){
+  const {error}=await supabase.rpc("reject_collection_payment",{target_collection:collectionId,target_user:memberId,target_slip:slipPath||null,target_reason:reason});
+  if(error)throw error;
+}
+
 export async function submitCollectionPayment(collectionId,userId,slipPath,paidForUserId=userId){
   const {error}=await supabase.rpc("submit_collection_payment",{target_collection:collectionId,target_slip:slipPath,target_user:paidForUserId});
   if(error)throw error;
 }
 
-export async function submitSettlement(tripId,toUser,amount,slipPath){
-  const {data,error}=await supabase.rpc("submit_settlement",{target_trip:tripId,target_to:toUser,target_amount:amount,target_slip:slipPath||null});
+export async function submitSettlement(tripId,toUser,amount,slipPath,fromUser){
+  const {data,error}=await supabase.rpc(fromUser?"submit_settlement_for_member":"submit_settlement",{target_trip:tripId,target_to:toUser,target_amount:amount,target_slip:slipPath||null,...(fromUser?{target_from:fromUser}:{})});
   if(error)throw error;
   return data;
 }

@@ -41,8 +41,8 @@ export function filterCollections(collections, filter = "all", currentUserId = "
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return (collections || []).filter((collection) => {
     const due = DATE_PATTERN.test(collection?.due || "") ? new Date(`${collection.due}T00:00:00`) : null;
-    if (filter === "overdue") return due && due < start;
-    if (filter === "due-soon") return due && due >= start && (due - start) / 86400000 <= 7;
+    if (filter === "overdue") return !isCollectionComplete(collection) && due && due < start;
+    if (filter === "due-soon") return !isCollectionComplete(collection) && due && due >= start && (due - start) / 86400000 <= 7;
     if (filter === "pending") return Object.values(collection?.payments || {}).some((payment) => payment?.status === "pending");
     if (filter === "mine") return Boolean(currentUserId && collection?.participants?.includes(currentUserId) && !collection?.paid?.includes(currentUserId) && collection?.payments?.[currentUserId]?.status !== "paid");
     return true;
