@@ -173,7 +173,7 @@ export async function loadTripData(tripId) {
     }).filter(e=>!e.fundOnly||e.amount>0),
     collections: collectionResult.data.map((c) => ({ id: c.id, createdBy:c.created_by, title: c.title,installmentId:c.installment_id||null,installmentBillSatang:c.installment_bill_satang==null?null:Number(c.installment_bill_satang),installmentFundPaidSatang:Number((installmentResult.data||[]).flatMap(p=>p.receipts).find(p=>p.collection_id===c.id)?.fund_paid_satang||0), createdAt:c.created_at, expenseId:c.expense_id||null, fundShares:c.fund_shares||null, amount: Number(c.amount), originalAmount:Number(c.original_amount??c.amount), fundRemainder:Number(c.fund_remainder||0), isFund:Boolean(c.is_fund),fundAccountLabel:c.fund_account_label||"",collectionType:c.collection_type,collectionOnly:Boolean(c.collection_only),receivingAccount:c.receiving_account_snapshot?{...c.receiving_account_snapshot,paymentQr:signedByPath[c.receiving_account_snapshot.payment_qr_path]||""}:null, perPerson: c.collection_payments.length ? Number(c.collection_payments[0].amount) : 0, receiver: c.receiver_id, due: c.due_date, participants: c.collection_payments.map((p) => p.user_id), paid: c.collection_payments.filter((p) => p.status === "paid").map((p) => p.user_id), payments: Object.fromEntries(c.collection_payments.map((p) => [p.user_id, { status: p.status,rejectionReason:p.rejection_reason||"",rejectedAt:p.rejected_at||null,superseded:Boolean(p.installment_superseded_at),cashReceivedSatang:(installmentResult.data||[]).flatMap(plan=>plan.receipts).find(row=>row.collection_id===c.id&&row.user_id===p.user_id)?.cash_satang??null, amount:Number(p.amount), receivedAmount:p.received_amount==null?null:Number(p.received_amount), submittedBy:p.submitted_by||p.user_id, slipPath: p.slip_url || "", slipUrl:signedByPath[p.slip_url]||"" }])) })),
     locations: locationResult.data,
-    settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,submittedBy:s.submitted_by||s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at})),
+    settlements: settlementResult.data.map((s)=>({id:s.id,from:s.from_user,submittedBy:s.submitted_by||s.from_user,to:s.to_user,amount:Number(s.amount),status:s.status,slipPath:s.slip_path||"",slipUrl:signedByPath[s.slip_path]||"",submittedAt:s.submitted_at,confirmedAt:s.confirmed_at,confirmedBy:s.confirmed_by,receiptMethod:s.receipt_method||"slip",receiptNote:s.receipt_note||""})),
     checkins: checkinResult.data.map((item)=>({stopId:item.stop_id,userId:item.user_id,checkedInAt:item.checked_in_at})),
     locationHistory: historyResult.error ? [] : (historyResult.data || []),
     routeDistance: routeStatsResult.error ? 0 : (routeStatsResult.data || []).reduce((sum,item)=>sum+Number(item.distance_m||0),0),
@@ -431,6 +431,12 @@ export async function submitCollectionPayment(collectionId,userId,slipPath,paidF
 
 export async function submitSettlement(tripId,toUser,amount,slipPath,fromUser){
   const {data,error}=await supabase.rpc(fromUser?"submit_settlement_for_member":"submit_settlement",{target_trip:tripId,target_to:toUser,target_amount:amount,target_slip:slipPath||null,...(fromUser?{target_from:fromUser}:{})});
+  if(error)throw error;
+  return data;
+}
+
+export async function recordOfflineSettlement(tripId,fromUser,toUser,amount,note,requestId){
+  const {data,error}=await supabase.rpc("record_offline_settlement",{target_trip:tripId,target_from:fromUser,target_to:toUser,target_amount:amount,target_note:note,request_id:requestId});
   if(error)throw error;
   return data;
 }

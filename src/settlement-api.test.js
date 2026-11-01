@@ -20,3 +20,10 @@ it('routes collection rejection with the expected slip and propagates failure wi
  await expect(rejectCollectionPayment('collection','debtor','trip/friend/old.png','ยอดผิด')).rejects.toThrow('permission denied');
  vi.unstubAllEnvs();
 });
+
+it('records manual receipts with a stable request id and never treats a failed RPC as paid',async()=>{
+ vi.stubEnv('VITE_SUPABASE_URL','https://example.supabase.co');vi.stubEnv('VITE_SUPABASE_ANON_KEY','test');const {recordOfflineSettlement}=await import('./supabase');
+ await recordOfflineSettlement('trip','debtor','receiver',40,'รับเงินสด','request');
+ expect(mock.rpc).toHaveBeenLastCalledWith('record_offline_settlement',{target_trip:'trip',target_from:'debtor',target_to:'receiver',target_amount:40,target_note:'รับเงินสด',request_id:'request'});
+ mock.rpc.mockResolvedValueOnce({error:new Error('balance changed')});await expect(recordOfflineSettlement('trip','debtor','receiver',40,'รับเงินสด','request')).rejects.toThrow('balance changed');vi.unstubAllEnvs();
+});

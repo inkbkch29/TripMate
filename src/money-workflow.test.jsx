@@ -48,3 +48,15 @@ it.each(['b','c'])('keeps a failed submission retryable for payer %s without mar
  await click('สรุปยอด');expect(document.body.textContent).toContain('รอตรวจสลิป');expect(document.body.textContent).toContain('฿100.00');
  });
 });
+
+it('lets the recipient record a partial offline receipt with an audit note and keeps the remainder due',async()=>{
+ const expense={id:'e',title:'เงินสำรอง',amount:100,paidBy:'a',participants:['b'],shares:{b:100}};
+ const record=vi.fn(async(t,amount,note,id)=>({id,...t,amount,status:'confirmed',receiptMethod:'offline',receiptNote:note,confirmedBy:'a',confirmedAt:'2026-11-01T15:00:00Z'}));
+ await mount(<Harness currentUserId="a" expenses={[expense]} initial={{...base,participants:[],payments:{},paid:[]}} onRecordOfflineSettlement={record}/>,async()=>{
+ await click('สรุปยอด');await click('บันทึกรับเงินนอกระบบ');await fill('ยอดรับจริง','40');await fill('หมายเหตุการรับเงิน','รับเงินสดแล้ว');await click('ยืนยันรับเงินจริง');expect(record).toHaveBeenCalledTimes(1);expect(document.body.textContent).toContain('฿60');expect(document.body.textContent).toContain('รับเงินสดแล้ว');expect(document.body.textContent).toContain('บันทึกโดย ผู้รับ');
+ });
+});
+it('hides manual receipts from ordinary members and while a slip is pending',async()=>{
+ const transfer={from:'b',to:'a',amount:100},record=vi.fn();
+ await mount(<SettlementCard transfer={transfer} members={members} currentUserId="b" busy="" onRecordOffline={record}/>,async(host,root)=>{expect(host.textContent).not.toContain('บันทึกรับเงินนอกระบบ');await act(async()=>root.render(<SettlementCard transfer={transfer} members={members} currentUserId="a" busy="" settlement={{status:'pending'}} onRecordOffline={record}/>));expect(host.textContent).not.toContain('บันทึกรับเงินนอกระบบ');});
+});
